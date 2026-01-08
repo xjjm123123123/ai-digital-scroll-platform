@@ -67,7 +67,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         <g>
           <rect width={SCROLL_WIDTH} height={SCROLL_HEIGHT} fill="url(#scrollGradient)" />
           <image 
-            href="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/binfengtu.jpg" 
+            href="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/binfengtu_small.jpg" 
             width={SCROLL_WIDTH} 
             height={SCROLL_HEIGHT} 
             preserveAspectRatio="xMidYMid slice"
