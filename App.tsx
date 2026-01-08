@@ -97,7 +97,7 @@ const App: React.FC = () => {
               <div className="relative">
                 <div className="w-32 h-32 flex items-center justify-center ink-glow">
                   <img 
-                    src="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/logo/logo.png" 
+                    src="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/logo/logo.png?v=transparent" 
                     alt="Logo" 
                     className="w-full h-full object-contain" 
                   />
