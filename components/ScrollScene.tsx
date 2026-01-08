@@ -14,6 +14,7 @@ interface ScrollSceneProps {
 const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, onViewChange, radarActive }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const bgRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<any>(null);
   const [currentScale, setCurrentScale] = useState(0.8);
 
@@ -27,12 +28,19 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
       .scaleExtent([0.1, 5])
       .translateExtent([[0, 0], [SCROLL_WIDTH, SCROLL_HEIGHT]])
       .on('zoom', (event) => {
+        const { x, y, k } = event.transform;
         g.attr('transform', event.transform);
-        setCurrentScale(event.transform.k);
+        
+        // 同步更新背景层，使用 GPU 加速
+        if (bgRef.current) {
+          bgRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${k})`;
+        }
+
+        setCurrentScale(k);
         onViewChange({
-          x: event.transform.x,
-          y: event.transform.y,
-          scale: event.transform.k
+          x: x,
+          y: y,
+          scale: k
         });
       });
 
@@ -62,18 +70,36 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   };
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-[#080808] cursor-grab active:cursor-grabbing overflow-hidden">
-      <svg ref={svgRef} className="w-full h-full" shapeRendering="optimizeSpeed">
+    <div ref={containerRef} className="w-full h-full bg-[#080808] cursor-grab active:cursor-grabbing overflow-hidden relative">
+      {/* 独立背景层 - GPU 加速 */}
+      <div 
+        ref={bgRef}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: SCROLL_WIDTH,
+          height: SCROLL_HEIGHT,
+          transformOrigin: '0 0',
+          backgroundImage: 'url(https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/binfengtu_small.jpg)',
+          backgroundSize: '100% 100%',
+          opacity: 0.9,
+          willChange: 'transform',
+          pointerEvents: 'none' // 确保不阻挡 SVG 事件
+        }}
+      />
+
+      <svg ref={svgRef} className="w-full h-full absolute top-0 left-0" shapeRendering="optimizeSpeed">
         <g>
           {/* <rect width={SCROLL_WIDTH} height={SCROLL_HEIGHT} fill="url(#scrollGradient)" /> */}
-          <image 
+          {/* <image 
             href="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/binfengtu_small.jpg" 
             width={SCROLL_WIDTH} 
             height={SCROLL_HEIGHT} 
             preserveAspectRatio="xMidYMid slice"
             opacity="0.9"
             style={{ willChange: 'transform' }}
-          />
+          /> */}
           {/* <rect width={SCROLL_WIDTH} height={SCROLL_HEIGHT} fill="url(#grid)" /> */}
 
           {HOTSPOTS.filter(h => isHotspotVisible(h.level)).map((h) => (
