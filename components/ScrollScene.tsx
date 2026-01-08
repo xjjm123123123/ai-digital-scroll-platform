@@ -71,7 +71,8 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
             width={SCROLL_WIDTH} 
             height={SCROLL_HEIGHT} 
             preserveAspectRatio="xMidYMid slice"
-            opacity="0.3"
+            opacity="0.8"
+            style={{ filter: 'brightness(1.1) contrast(1.1)' }}
           />
           <rect width={SCROLL_WIDTH} height={SCROLL_HEIGHT} fill="url(#grid)" />
 
