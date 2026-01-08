@@ -20,8 +20,12 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
       {/* 顶部导航 */}
       <nav className="absolute top-0 left-0 w-full z-50 flex justify-between items-center px-8 py-6 pointer-events-none">
         <div className="flex items-center gap-4 pointer-events-auto cursor-pointer" onClick={() => onNavigate('home')}>
-          <div className="w-10 h-10 border-2 border-[#c5a059] flex items-center justify-center rotate-45">
-            <span className="-rotate-45 text-sm font-bold text-[#c5a059]">豳</span>
+          <div className="w-12 h-12 flex items-center justify-center">
+            <img 
+              src="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/logo/logo.png" 
+              alt="Logo" 
+              className="w-full h-full object-contain" 
+            />
           </div>
           <h1 className="text-xl font-bold tracking-widest chinese-font">豳风数字交互平台</h1>
         </div>

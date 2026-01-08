@@ -95,15 +95,26 @@ const App: React.FC = () => {
           <div className="relative z-10 text-center space-y-16 max-w-4xl px-8">
             <div className="flex flex-col items-center gap-10">
               <div className="relative">
-                <div className="w-24 h-24 border-2 border-[#c5a059] rotate-45 flex items-center justify-center ink-glow">
-                  <span className="-rotate-45 text-4xl font-bold text-[#c5a059] chinese-font">豳</span>
+                <div className="w-32 h-32 flex items-center justify-center ink-glow">
+                  <img 
+                    src="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/logo/logo.png" 
+                    alt="Logo" 
+                    className="w-full h-full object-contain" 
+                  />
                 </div>
-                <div className="absolute -top-4 -right-12 red-seal text-xs rotate-12">卷壹</div>
+                
+                {/* 装饰光圈 */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border border-[#c5a059]/20 rounded-full animate-spin-slow" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 border border-[#c5a059]/30 rounded-full animate-reverse-spin" />
               </div>
-              <div className="space-y-4">
-                <h1 className="text-8xl font-serif text-[#f0e6d2] tracking-[0.4em] leading-tight opacity-90">豳风图</h1>
-                <p className="text-[#c5a059] tracking-[0.8em] text-[10px] uppercase opacity-60">Digital Interactive Scroll Reconstruction</p>
-              </div>
+              
+              <h1 className="text-6xl md:text-8xl font-bold tracking-[0.5em] text-[#e8dcc4] chinese-font ml-8 drop-shadow-2xl">
+                豳风图
+              </h1>
+              
+              <p className="text-xl md:text-2xl text-[#c5a059]/80 font-serif tracking-[0.3em] ml-2">
+                数字长卷交互平台
+              </p>
             </div>
 
             <p className="text-white/40 text-lg leading-loose tracking-[0.4em] font-serif italic max-w-2xl mx-auto border-y border-[#c5a059]/10 py-10">
