@@ -91,17 +91,6 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
 
       <svg ref={svgRef} className="w-full h-full absolute top-0 left-0" shapeRendering="optimizeSpeed">
         <g>
-          {/* <rect width={SCROLL_WIDTH} height={SCROLL_HEIGHT} fill="url(#scrollGradient)" /> */}
-          {/* <image 
-            href="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/binfengtu_small.jpg" 
-            width={SCROLL_WIDTH} 
-            height={SCROLL_HEIGHT} 
-            preserveAspectRatio="xMidYMid slice"
-            opacity="0.9"
-            style={{ willChange: 'transform' }}
-          /> */}
-          {/* <rect width={SCROLL_WIDTH} height={SCROLL_HEIGHT} fill="url(#grid)" /> */}
-
           {HOTSPOTS.filter(h => isHotspotVisible(h.level)).map((h) => (
             <g 
               key={h.id} 
@@ -146,16 +135,8 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
             </g>
           ))}
         </g>
-        <defs>
-          {/* <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
-            <path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(197, 160, 89, 0.03)" strokeWidth="0.5"/>
-          </pattern>
-          <linearGradient id="scrollGradient" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#0a0a0a" />
-            <stop offset="50%" stopColor="#121212" />
-            <stop offset="100%" stopColor="#0a0a0a" />
-          </linearGradient> */}
-        </defs>
+        {/* <defs>
+        </defs> */}
       </svg>
     </div>
   );
