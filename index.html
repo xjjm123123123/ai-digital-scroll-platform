@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>豳风图 - AI数字长卷交互平台</title>
+    <link rel="icon" type="image/png" href="/images/logo/logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Zhi+Mang+Xing&display=swap" rel="stylesheet">
     <style>
@@ -28,9 +29,9 @@
             height: 100%;
             pointer-events: none;
             z-index: 999;
-            opacity: 0.05;
+            opacity: 0.12;
             background-image: url('https://www.transparenttextures.com/patterns/natural-paper.png');
-            mix-blend-mode: multiply;
+            mix-blend-mode: overlay;
         }
         .glass-panel {
             background: rgba(15, 15, 15, 0.85);
@@ -38,7 +39,13 @@
             border: 1px solid rgba(197, 160, 89, 0.2);
         }
         .ink-glow {
-            box-shadow: 0 0 30px rgba(197, 160, 89, 0.15);
+            filter: drop-shadow(0 0 15px rgba(197, 160, 89, 0.5));
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 15px rgba(197, 160, 89, 0.3)); }
+            50% { filter: drop-shadow(0 0 25px rgba(197, 160, 89, 0.8)); }
         }
         .red-seal {
             background-color: #b22222;

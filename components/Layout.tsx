@@ -22,7 +22,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
         <div className="flex items-center gap-4 pointer-events-auto cursor-pointer" onClick={() => onNavigate('home')}>
           <div className="w-12 h-12 flex items-center justify-center">
             <img 
-              src="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/logo/Simplification.svg" 
+              src="/images/logo/logo.png" 
               alt="Logo" 
               className="w-full h-full object-contain" 
             />

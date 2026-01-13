@@ -16,7 +16,25 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const svgRef = useRef<SVGSVGElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<any>(null);
-  const [currentScale, setCurrentScale] = useState(0.8);
+  const [currentScale, setCurrentScale] = useState(1);
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const [bgImageSize, setBgImageSize] = useState({ width: SCROLL_WIDTH, height: SCROLL_HEIGHT });
+  const [displayScale, setDisplayScale] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
+  const [lastInteractionTime, setLastInteractionTime] = useState(0);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+  const bgImageUrl = '/images/binfengtu_small.jpg';
+
+  useEffect(() => {
+    // 预加载长卷背景图
+    const img = new Image();
+    img.src = bgImageUrl;
+    img.onload = () => {
+      setBgImageSize({ width: img.width, height: img.height });
+      setIsImageLoaded(true);
+    };
+    img.onerror = () => setIsImageLoaded(true); // 即使失败也允许显示（可能显示为空或颜色）
+  }, []);
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -25,31 +43,103 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
     const g = svg.select('g');
 
     const zoom = d3.zoom()
-      .scaleExtent([0.1, 5])
+      .scaleExtent([1, 1])
       .translateExtent([[0, 0], [SCROLL_WIDTH, SCROLL_HEIGHT]])
+      .on('start', () => {
+        setIsDragging(true);
+        setLastInteractionTime(performance.now());
+        setIsAutoScrolling(false);
+      })
       .on('zoom', (event) => {
         const { x, y, k } = event.transform;
-        g.attr('transform', event.transform);
         
-        // 同步更新背景层，使用 GPU 加速
+        const containerHeight = containerRef.current?.clientHeight || SCROLL_HEIGHT;
+        const containerWidth = containerRef.current?.clientWidth || SCROLL_WIDTH;
+        
+        const scale = (containerHeight * 0.25) / SCROLL_HEIGHT;
+        const offsetY = containerHeight * 0.1;
+        
+        g.attr('transform', `translate(${x}, ${offsetY}) scale(${scale})`);
+        
         if (bgRef.current) {
-          bgRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${k})`;
+          bgRef.current.style.transform = `translate3d(${x}px, ${offsetY}px, 0) scale(${scale})`;
         }
 
         setCurrentScale(k);
+        setLastInteractionTime(performance.now());
+        setIsAutoScrolling(false);
+        
         onViewChange({
           x: x,
-          y: y,
+          y: offsetY,
           scale: k
         });
+      })
+      .on('end', () => {
+        setIsDragging(false);
+        setLastInteractionTime(performance.now());
       });
 
     zoomRef.current = zoom;
     svg.call(zoom);
-    svg.call(zoom.transform, d3.zoomIdentity.scale(0.8).translate(100, 100));
+    
+    const containerHeight = containerRef.current?.clientHeight || SCROLL_HEIGHT;
+    const scale = (containerHeight * 0.25) / SCROLL_HEIGHT;
+    const offsetY = containerHeight * 0.1;
+    setDisplayScale(scale);
+    svg.call(zoom.transform, d3.zoomIdentity.translate(0, offsetY).scale(1));
 
-    return () => svg.on('.zoom', null);
+    const handleMouseMove = () => {
+      setLastInteractionTime(performance.now());
+      setIsAutoScrolling(false);
+    };
+
+    containerRef.current.addEventListener('mousemove', handleMouseMove);
+
+    return () => {
+      svg.on('.zoom', null);
+      if (containerRef.current) {
+        containerRef.current.removeEventListener('mousemove', handleMouseMove);
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    let animationFrameId: number;
+    let lastTime = performance.now();
+    
+    const animate = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime;
+      lastTime = currentTime;
+      
+      const timeSinceLastInteraction = lastInteractionTime === 0 ? 10001 : currentTime - lastInteractionTime;
+      const shouldAutoScroll = timeSinceLastInteraction > 10000 && !isDragging;
+      
+      if (shouldAutoScroll && zoomRef.current && svgRef.current) {
+        setIsAutoScrolling(true);
+        
+        const currentTransform = d3.zoomTransform(svgRef.current);
+        const scrollSpeed = 0.5;
+        const newX = currentTransform.x + scrollSpeed * (deltaTime / 16.67);
+        const maxScroll = SCROLL_WIDTH * 0.25 - (containerRef.current?.clientWidth || 0);
+        
+        const finalX = newX > maxScroll ? 0 : newX;
+        
+        d3.select(svgRef.current)
+          .call(zoomRef.current.transform, d3.zoomIdentity.translate(finalX, currentTransform.y).scale(currentTransform.k));
+      }
+      
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    
+    animationFrameId = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [isDragging, lastInteractionTime]);
 
   useEffect(() => {
     if (externalPos && zoomRef.current && svgRef.current) {
@@ -61,16 +151,31 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
     }
   }, [externalPos]);
 
-  // 语义 LOD 实现
+  // 语义 LOD 实现 - 缩放固定为1，简化可见性逻辑
   const isHotspotVisible = (level: HotspotLevel) => {
     if (radarActive) return true;
-    if (currentScale < 0.4) return level === HotspotLevel.CHAPTER;
-    if (currentScale < 1.2) return level !== HotspotLevel.DETAIL;
+    // 缩放固定为1，显示所有热区
     return true;
   };
 
   return (
     <div ref={containerRef} className="w-full h-full bg-[#080808] cursor-grab active:cursor-grabbing overflow-hidden relative">
+      {/* 加载界面 */}
+      {!isImageLoaded && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#080808]">
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-[#c5a059]/20 rounded-full"></div>
+              <div className="absolute top-0 left-0 w-16 h-16 border-4 border-[#c5a059] rounded-full border-t-transparent animate-spin"></div>
+            </div>
+            <div className="text-center">
+              <p className="text-[#c5a059] text-lg font-serif tracking-widest">正在加载长卷...</p>
+              <p className="text-[#f0e6d2]/40 text-sm mt-2">Loading Scroll</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 独立背景层 - GPU 加速 */}
       <div 
         ref={bgRef}
@@ -78,19 +183,22 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
           position: 'absolute',
           top: 0,
           left: 0,
-          width: SCROLL_WIDTH,
-          height: SCROLL_HEIGHT,
+          width: bgImageSize.width,
+          height: bgImageSize.height,
           transformOrigin: '0 0',
-          backgroundImage: 'url(https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/binfengtu_small.jpg)',
-          backgroundSize: '100% 100%',
+          backgroundImage: 'url(/images/binfengtu_small.jpg)',
+          backgroundSize: 'contain',
+          backgroundPosition: 'center top',
+          backgroundRepeat: 'no-repeat',
           opacity: 0.9,
           willChange: 'transform',
-          pointerEvents: 'none' // 确保不阻挡 SVG 事件
+          pointerEvents: 'none',
+          transform: `translate3d(0px, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1}px, 0) scale(${displayScale})`
         }}
       />
 
       <svg ref={svgRef} className="w-full h-full absolute top-0 left-0" shapeRendering="optimizeSpeed">
-        <g>
+        <g transform={`translate(0, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1})`}>
           {HOTSPOTS.filter(h => isHotspotVisible(h.level)).map((h) => (
             <g 
               key={h.id} 

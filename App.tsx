@@ -6,6 +6,7 @@ import MiniMap from './components/MiniMap';
 import VideoPortal from './components/VideoPortal';
 import MethodView from './components/MethodView';
 import BackgroundView from './components/BackgroundView';
+import LiquidEther from './components/LiquidEther';
 import { AppState, Hotspot } from './types';
 import { SCROLL_WIDTH } from './constants';
 
@@ -23,6 +24,36 @@ const App: React.FC = () => {
   const [radarActive, setRadarActive] = useState(false);
   const [history, setHistory] = useState<Hotspot[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 资源预加载
+  useEffect(() => {
+    const imagesToLoad = [
+      '/images/binfengtu_small.jpg',
+      '/images/logo/Simplification.svg'
+    ];
+
+    const loadImages = async () => {
+      try {
+        const promises = imagesToLoad.map(src => {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = src;
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+        });
+        await Promise.all(promises);
+        // 最少展示 1.5s Loading，避免闪烁
+        setTimeout(() => setIsLoading(false), 1500);
+      } catch (err) {
+        console.error('Failed to load images', err);
+        setIsLoading(false);
+      }
+    };
+
+    loadImages();
+  }, []);
 
   // 快捷键支持
   useEffect(() => {
@@ -54,50 +85,107 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [state.currentView, state.selectedHotspot, state.activeMode, state.position]);
 
-  const handleNavigate = (view: AppState['currentView']) => {
+  const handleNavigate = useCallback((view: AppState['currentView']) => {
     setState(prev => ({ ...prev, currentView: view, selectedHotspot: null }));
-  };
+  }, []);
 
-  const handleHotspotClick = (h: Hotspot) => {
+  const handleExploreClick = useCallback(() => {
+    handleNavigate('explore');
+  }, [handleNavigate]);
+
+  const handleHotspotClick = useCallback((h: Hotspot) => {
     setState(prev => ({ ...prev, selectedHotspot: h }));
     setHistory(prev => {
       const filtered = prev.filter(item => item.id !== h.id);
       return [h, ...filtered].slice(0, 10);
     });
-  };
+  }, []);
 
-  const handleJump = (targetX: number) => {
+  const handleJump = useCallback((targetX: number) => {
     setJumpRequest({ x: targetX, y: 0, scale: 1 });
-  };
+  }, []);
 
-  const handleDeepJump = (target: Hotspot) => {
+  const handleDeepJump = useCallback((target: Hotspot) => {
     setState(prev => ({ ...prev, selectedHotspot: null }));
     const targetX = -(target.x / 100) * SCROLL_WIDTH + window.innerWidth / 2;
     setJumpRequest({ x: targetX, y: 0, scale: 1.5 });
     
-    // 飞行完成后开启新弹窗
     setTimeout(() => {
       handleHotspotClick(target);
     }, 1300);
-  };
+  }, [handleHotspotClick]);
 
   const handleViewChange = useCallback((pos: { x: number; y: number; scale: number }) => {
     setState(prev => ({ ...prev, position: { x: pos.x, y: pos.y }, scale: pos.scale }));
   }, []);
 
+  const handleRadarClick = useCallback(() => {
+    setRadarActive(true);
+  }, []);
+
+  const handleHistoryClick = useCallback(() => {
+    setShowHistory(prev => !prev);
+  }, []);
+
+  const handleHistoryItemClick = useCallback((hotspot: Hotspot) => {
+    handleDeepJump(hotspot);
+  }, [handleDeepJump]);
+
+  const handleVideoPortalClose = useCallback(() => {
+    setState(prev => ({ ...prev, selectedHotspot: null }));
+  }, []);
+
+  const handleVideoModeChange = useCallback((m: string) => {
+    setState(prev => ({ ...prev, activeMode: m }));
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-[#0c0c0c] flex flex-col items-center justify-center select-none">
+        <div className="relative">
+          <div className="w-40 h-40 flex items-center justify-center ink-glow">
+            <img 
+              src="/images/logo/Simplification.svg" 
+              alt="Loading..." 
+              className="w-full h-full object-contain opacity-90" 
+            />
+          </div>
+        </div>
+        <div className="mt-12 text-[#c5a059] text-xl tracking-[0.8em] font-bold chinese-font opacity-80 animate-pulse ml-4">
+          载入中
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Layout currentView={state.currentView} onNavigate={handleNavigate}>
       {state.currentView === 'home' && (
         <div className="w-full h-full flex flex-col items-center justify-center bg-black overflow-hidden relative">
-          {/* 背景装饰 */}
-          <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/bg/1920/1080')] opacity-5 blur-3xl scale-125 animate-pulse" />
+          {/* 背景装饰 - LiquidEther */}
+          <div className="absolute inset-0 z-0 opacity-40">
+            <LiquidEther 
+              mouseForce={20} 
+              cursorSize={140} 
+              isViscous={false} 
+              viscous={65} 
+              colors={["#c2c1c8","#eeefe6","#ffffff"]} 
+              autoDemo 
+              autoSpeed={0.5} 
+              autoIntensity={3.7} 
+              isBounce={false} 
+              resolution={0.75} 
+              backgroundImage="/images/binfengtu_small.jpg"
+              style={{ width: '100%', height: '100%' }}
+            /> 
+          </div>
           
           <div className="relative z-10 text-center space-y-16 max-w-4xl px-8">
             <div className="flex flex-col items-center gap-10">
               <div className="relative">
                 <div className="w-32 h-32 flex items-center justify-center ink-glow">
                   <img 
-                    src="https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/logo/Simplification.svg" 
+                    src="/images/logo/Simplification.svg" 
                     alt="Logo" 
                     className="w-full h-full object-contain" 
                   />
@@ -124,7 +212,7 @@ const App: React.FC = () => {
             </p>
 
             <button 
-              onClick={() => handleNavigate('explore')}
+              onClick={handleExploreClick}
               className="group relative px-20 py-6 bg-transparent border border-[#c5a059]/40 text-[#c5a059] font-bold tracking-[0.8em] overflow-hidden transition-all duration-700 hover:text-black"
             >
               <div className="absolute inset-0 bg-[#c5a059] -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out" />
@@ -166,7 +254,7 @@ const App: React.FC = () => {
               <div className="h-10 w-[1px] bg-white/10" />
               <div className="flex gap-6">
                  <button 
-                  onClick={() => setRadarActive(true)}
+                  onClick={handleRadarClick}
                   className={`flex flex-col items-center gap-1 transition-all ${radarActive ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
                  >
                    <div className="w-5 h-5 border border-current rounded-full flex items-center justify-center">
@@ -175,7 +263,7 @@ const App: React.FC = () => {
                    <span className="text-[8px] tracking-tighter">探测(R)</span>
                  </button>
                  <button 
-                  onClick={() => setShowHistory(!showHistory)}
+                  onClick={handleHistoryClick}
                   className={`flex flex-col items-center gap-1 transition-all ${showHistory ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
                  >
                    <div className="w-5 h-5 border border-current rounded p-[3px] flex flex-col gap-[2px]">
@@ -194,7 +282,7 @@ const App: React.FC = () => {
                   {history.length > 0 ? history.map(h => (
                     <button 
                       key={h.id}
-                      onClick={() => handleDeepJump(h)}
+                      onClick={() => handleHistoryItemClick(h)}
                       className="w-full text-left text-[11px] text-white/60 hover:text-[#c5a059] transition-colors truncate font-serif"
                     >
                       · {h.label}
@@ -213,10 +301,10 @@ const App: React.FC = () => {
       {state.selectedHotspot && (
         <VideoPortal 
           hotspot={state.selectedHotspot} 
-          onClose={() => setState(prev => ({ ...prev, selectedHotspot: null }))} 
+          onClose={handleVideoPortalClose} 
           onJumpTo={handleDeepJump}
           activeMode={state.activeMode}
-          onModeChange={(m) => setState(prev => ({ ...prev, activeMode: m }))}
+          onModeChange={handleVideoModeChange}
         />
       )}
     </Layout>
