@@ -176,76 +176,81 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         </div>
       )}
 
-      {/* 独立背景层 - GPU 加速 */}
-      <div 
-        ref={bgRef}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: bgImageSize.width,
-          height: bgImageSize.height,
-          transformOrigin: '0 0',
-          backgroundImage: 'url(/images/binfengtu_small.jpg)',
-          backgroundSize: 'contain',
-          backgroundPosition: 'center top',
-          backgroundRepeat: 'no-repeat',
-          opacity: 0.9,
-          willChange: 'transform',
-          pointerEvents: 'none',
-          transform: `translate3d(0px, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1}px, 0) scale(${displayScale})`
-        }}
-      />
+      {/* 独立背景层 - GPU 加速 - 仅在图像加载完成后渲染 */}
+      {isImageLoaded && (
+        <div 
+          ref={bgRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: bgImageSize.width,
+            height: bgImageSize.height,
+            transformOrigin: '0 0',
+            backgroundImage: 'url(/images/binfengtu_small.jpg)',
+            backgroundSize: 'contain',
+            backgroundPosition: 'center top',
+            backgroundRepeat: 'no-repeat',
+            opacity: 0.9,
+            willChange: 'transform',
+            pointerEvents: 'none',
+            transform: `translate3d(0px, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1}px, 0) scale(${displayScale})`
+          }}
+        />
+      )}
 
-      <svg ref={svgRef} className="w-full h-full absolute top-0 left-0" shapeRendering="optimizeSpeed">
-        <g transform={`translate(0, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1})`}>
-          {HOTSPOTS.filter(h => isHotspotVisible(h.level)).map((h) => (
-            <g 
-              key={h.id} 
-              className="cursor-pointer group animate-in fade-in duration-500" 
-              transform={`translate(${(h.x / 100) * SCROLL_WIDTH}, ${(h.y / 100) * SCROLL_HEIGHT})`}
-              onClick={() => onHotspotClick(h)}
-            >
-              {/* 热区边界 */}
-              <rect 
-                width={h.width} 
-                height={h.height} 
-                fill={radarActive ? "rgba(197, 160, 89, 0.12)" : "rgba(197, 160, 89, 0.02)"} 
-                stroke={radarActive ? "rgba(197, 160, 89, 0.7)" : "rgba(197, 160, 89, 0.2)"} 
-                strokeWidth={radarActive ? "1.5" : "0.5"}
-                strokeDasharray={radarActive ? "none" : "3 3"}
-                className="transition-all duration-700 group-hover:fill-[#c5a059]/15 group-hover:stroke-[#c5a059]"
-              />
-              
-              {/* 四角笔触装饰 */}
-              <g className="opacity-40 group-hover:opacity-100 transition-opacity">
-                <path d="M 0 12 L 0 0 L 12 0" fill="none" stroke="#c5a059" strokeWidth="2" />
-                <path d={`M ${h.width - 12} 0 L ${h.width} 0 L ${h.width} 12`} fill="none" stroke="#c5a059" strokeWidth="2" />
-                <path d={`M 0 ${h.height - 12} L 0 ${h.height} 12 ${h.height}`} fill="none" stroke="#c5a059" strokeWidth="2" />
-                <path d={`M ${h.width - 12} ${h.height} L ${h.width} ${h.height} ${h.width} ${h.height - 12}`} fill="none" stroke="#c5a059" strokeWidth="2" />
-              </g>
-              
-              <foreignObject x="0" y={h.height + 6} width="300" height="80">
-                <div className="flex flex-col opacity-60 group-hover:opacity-100 transition-all group-hover:translate-x-1">
-                  <span className="text-[8px] text-[#c5a059] uppercase tracking-[0.4em] font-bold">{h.category}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`${h.level === HotspotLevel.CHAPTER ? 'text-2xl' : 'text-lg'} text-white font-serif leading-tight`}>
-                      {h.label}
-                    </span>
-                    {h.originalImage && <div className="red-seal scale-[0.6] origin-left -ml-2">对照</div>}
+      {/* SVG 层 - 仅在图像加载完成后渲染 */}
+      {isImageLoaded && (
+        <svg ref={svgRef} className="w-full h-full absolute top-0 left-0" shapeRendering="optimizeSpeed">
+          <g transform={`translate(0, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1})`}>
+            {HOTSPOTS.filter(h => isHotspotVisible(h.level)).map((h) => (
+              <g 
+                key={h.id} 
+                className="cursor-pointer group animate-in fade-in duration-500" 
+                transform={`translate(${(h.x / 100) * SCROLL_WIDTH}, ${(h.y / 100) * SCROLL_HEIGHT})`}
+                onClick={() => onHotspotClick(h)}
+              >
+                {/* 热区边界 */}
+                <rect 
+                  width={h.width} 
+                  height={h.height} 
+                  fill={radarActive ? "rgba(197, 160, 89, 0.12)" : "rgba(197, 160, 89, 0.02)"} 
+                  stroke={radarActive ? "rgba(197, 160, 89, 0.7)" : "rgba(197, 160, 89, 0.2)"} 
+                  strokeWidth={radarActive ? "1.5" : "0.5"}
+                  strokeDasharray={radarActive ? "none" : "3 3"}
+                  className="transition-all duration-700 group-hover:fill-[#c5a059]/15 group-hover:stroke-[#c5a059]"
+                />
+                
+                {/* 四角笔触装饰 */}
+                <g className="opacity-40 group-hover:opacity-100 transition-opacity">
+                  <path d="M 0 12 L 0 0 L 12 0" fill="none" stroke="#c5a059" strokeWidth="2" />
+                  <path d={`M ${h.width - 12} 0 L ${h.width} 0 L ${h.width} 12`} fill="none" stroke="#c5a059" strokeWidth="2" />
+                  <path d={`M 0 ${h.height - 12} L 0 ${h.height} 12 ${h.height}`} fill="none" stroke="#c5a059" strokeWidth="2" />
+                  <path d={`M ${h.width - 12} ${h.height} L ${h.width} ${h.height} ${h.width} ${h.height - 12}`} fill="none" stroke="#c5a059" strokeWidth="2" />
+                </g>
+                
+                <foreignObject x="0" y={h.height + 6} width="300" height="80">
+                  <div className="flex flex-col opacity-60 group-hover:opacity-100 transition-all group-hover:translate-x-1">
+                    <span className="text-[8px] text-[#c5a059] uppercase tracking-[0.4em] font-bold">{h.category}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`${h.level === HotspotLevel.CHAPTER ? 'text-2xl' : 'text-lg'} text-white font-serif leading-tight`}>
+                        {h.label}
+                      </span>
+                      {h.originalImage && <div className="red-seal scale-[0.6] origin-left -ml-2">对照</div>}
+                    </div>
                   </div>
-                </div>
-              </foreignObject>
+                </foreignObject>
 
-              <div className="ink-pulse absolute" style={{ left: h.width/2, top: h.height/2 }}>
-                <div className="w-3 h-3 rounded-full bg-[#c5a059]" />
-              </div>
-            </g>
-          ))}
-        </g>
-        {/* <defs>
-        </defs> */}
-      </svg>
+                <div className="ink-pulse absolute" style={{ left: h.width/2, top: h.height/2 }}>
+                  <div className="w-3 h-3 rounded-full bg-[#c5a059]" />
+                </div>
+              </g>
+            ))}
+          </g>
+          {/* <defs>
+          </defs> */}
+        </svg>
+      )}
     </div>
   );
 };
