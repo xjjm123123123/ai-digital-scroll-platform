@@ -23,60 +23,17 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const [isDragging, setIsDragging] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState(0);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
-  const [loadedSegments, setLoadedSegments] = useState<Set<number>>(new Set());
-  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
-  
-  const SEGMENT_COUNT = 4;
-  const SEGMENT_WIDTH = SCROLL_WIDTH / SEGMENT_COUNT;
   const bgImageUrl = '/images/binfengtu_small.jpg';
 
   useEffect(() => {
-    const totalSegments = SEGMENT_COUNT;
-    const loadedSegments: number[] = [];
-    let hasError = false;
-
-    const loadSegment = (index: number): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        
-        img.src = bgImageUrl;
-        
-        img.onload = () => {
-          loadedSegments.push(index);
-          setLoadedSegments(new Set(loadedSegments));
-          
-          if (loadedSegments.length === totalSegments) {
-            const dimensions = { width: img.width, height: img.height };
-            setBgImageSize(dimensions);
-            setImageDimensions(dimensions);
-            setTimeout(() => {
-              setIsImageLoaded(true);
-            }, 500);
-          }
-          resolve();
-        };
-        
-        img.onerror = () => {
-          hasError = true;
-          if (loadedSegments.length === totalSegments || hasError) {
-            const dimensions = { width: SCROLL_WIDTH, height: SCROLL_HEIGHT };
-            setBgImageSize(dimensions);
-            setImageDimensions(dimensions);
-            setTimeout(() => {
-              setIsImageLoaded(true);
-            }, 500);
-          }
-          resolve();
-        };
-      });
+    // 预加载长卷背景图
+    const img = new Image();
+    img.src = bgImageUrl;
+    img.onload = () => {
+      setBgImageSize({ width: img.width, height: img.height });
+      setIsImageLoaded(true);
     };
-
-    const loadAllSegments = async () => {
-      const promises = Array.from({ length: totalSegments }, (_, i) => loadSegment(i));
-      await Promise.all(promises);
-    };
-
-    loadAllSegments();
+    img.onerror = () => setIsImageLoaded(true); // 即使失败也允许显示（可能显示为空或颜色）
   }, []);
 
   useEffect(() => {
@@ -214,58 +171,32 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
             <div className="text-center">
               <p className="text-[#c5a059] text-lg font-serif tracking-widest">正在加载长卷...</p>
               <p className="text-[#f0e6d2]/40 text-sm mt-2">Loading Scroll</p>
-              <div className="mt-4 flex gap-1">
-                {Array.from({ length: SEGMENT_COUNT }).map((_, i) => (
-                  <div 
-                    key={i}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      loadedSegments.has(i) ? 'bg-[#c5a059]' : 'bg-[#c5a059]/20'
-                    }`}
-                  />
-                ))}
-              </div>
-              <p className="text-[#f0e6d2]/30 text-xs mt-2">
-                {loadedSegments.size} / {SEGMENT_COUNT}
-              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* 分段背景层 - GPU 加速 - 仅在图像加载完成后渲染 */}
-      {isImageLoaded && imageDimensions.width > 0 && (
+      {/* 独立背景层 - GPU 加速 - 仅在图像加载完成后渲染 */}
+      {isImageLoaded && (
         <div 
           ref={bgRef}
           style={{
             position: 'absolute',
             top: 0,
             left: 0,
-            width: imageDimensions.width,
-            height: imageDimensions.height,
+            width: bgImageSize.width,
+            height: bgImageSize.height,
             transformOrigin: '0 0',
+            backgroundImage: 'url(/images/binfengtu_small.jpg)',
+            backgroundSize: 'contain',
+            backgroundPosition: 'center top',
+            backgroundRepeat: 'no-repeat',
             opacity: 0.9,
             willChange: 'transform',
             pointerEvents: 'none',
             transform: `translate3d(0px, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1}px, 0) scale(${displayScale})`
           }}
-        >
-          {Array.from({ length: SEGMENT_COUNT }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: i * SEGMENT_WIDTH,
-                width: SEGMENT_WIDTH,
-                height: imageDimensions.height,
-                backgroundImage: 'url(/images/binfengtu_small.jpg)',
-                backgroundSize: `${imageDimensions.width}px ${imageDimensions.height}px`,
-                backgroundPosition: `-${i * SEGMENT_WIDTH}px 0`,
-                backgroundRepeat: 'no-repeat'
-              }}
-            />
-          ))}
-        </div>
+        />
       )}
 
       {/* SVG 层 - 始终渲染以保持交互功能 */}
