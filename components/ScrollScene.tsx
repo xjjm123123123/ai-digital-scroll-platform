@@ -24,6 +24,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const [lastInteractionTime, setLastInteractionTime] = useState(0);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const [loadedSegments, setLoadedSegments] = useState<Set<number>>(new Set());
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   
   const SEGMENT_COUNT = 4;
   const SEGMENT_WIDTH = SCROLL_WIDTH / SEGMENT_COUNT;
@@ -45,7 +46,9 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
           setLoadedSegments(new Set(loadedSegments));
           
           if (loadedSegments.length === totalSegments) {
-            setBgImageSize({ width: img.width, height: img.height });
+            const dimensions = { width: img.width, height: img.height };
+            setBgImageSize(dimensions);
+            setImageDimensions(dimensions);
             setTimeout(() => {
               setIsImageLoaded(true);
             }, 500);
@@ -56,7 +59,9 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         img.onerror = () => {
           hasError = true;
           if (loadedSegments.length === totalSegments || hasError) {
-            setBgImageSize({ width: SCROLL_WIDTH, height: SCROLL_HEIGHT });
+            const dimensions = { width: SCROLL_WIDTH, height: SCROLL_HEIGHT };
+            setBgImageSize(dimensions);
+            setImageDimensions(dimensions);
             setTimeout(() => {
               setIsImageLoaded(true);
             }, 500);
@@ -228,15 +233,15 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
       )}
 
       {/* 分段背景层 - GPU 加速 - 仅在图像加载完成后渲染 */}
-      {isImageLoaded && (
+      {isImageLoaded && imageDimensions.width > 0 && (
         <div 
           ref={bgRef}
           style={{
             position: 'absolute',
             top: 0,
             left: 0,
-            width: bgImageSize.width,
-            height: bgImageSize.height,
+            width: imageDimensions.width,
+            height: imageDimensions.height,
             transformOrigin: '0 0',
             opacity: 0.9,
             willChange: 'transform',
@@ -252,9 +257,9 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
                 top: 0,
                 left: i * SEGMENT_WIDTH,
                 width: SEGMENT_WIDTH,
-                height: bgImageSize.height,
+                height: imageDimensions.height,
                 backgroundImage: 'url(/images/binfengtu_small.jpg)',
-                backgroundSize: `${bgImageSize.width}px ${bgImageSize.height}px`,
+                backgroundSize: `${imageDimensions.width}px ${imageDimensions.height}px`,
                 backgroundPosition: `-${i * SEGMENT_WIDTH}px 0`,
                 backgroundRepeat: 'no-repeat'
               }}
