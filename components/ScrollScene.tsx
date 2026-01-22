@@ -44,7 +44,8 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
 
     const zoom = d3.zoom()
       .scaleExtent([1, 1])
-      .translateExtent([[0, 0], [SCROLL_WIDTH, SCROLL_HEIGHT]])
+      // 扩大拖拽范围，确保可以拖动到最右边，甚至稍微超出一点以便回弹体验
+      .translateExtent([[-SCROLL_WIDTH * 0.5, 0], [SCROLL_WIDTH * 1.5, SCROLL_HEIGHT]])
       .on('start', () => {
         setIsDragging(true);
         setLastInteractionTime(performance.now());
@@ -120,10 +121,17 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         
         const currentTransform = d3.zoomTransform(svgRef.current);
         const scrollSpeed = 0.5;
-        const newX = currentTransform.x + scrollSpeed * (deltaTime / 16.67);
-        const maxScroll = SCROLL_WIDTH * 0.25 - (containerRef.current?.clientWidth || 0);
+        // 向左滚动（x减小），查看右侧内容
+        const newX = currentTransform.x - scrollSpeed * (deltaTime / 16.67);
         
-        const finalX = newX > maxScroll ? 0 : newX;
+        // 计算最大滚动距离（负值）
+        // 视口宽度 - 内容实际宽度
+        const containerWidth = containerRef.current?.clientWidth || 0;
+        const contentWidth = SCROLL_WIDTH * currentTransform.k;
+        const minX = containerWidth - contentWidth;
+        
+        // 如果滚动超出范围（比最小值还小），重置回 0
+        const finalX = newX < minX ? 0 : newX;
         
         d3.select(svgRef.current)
           .call(zoomRef.current.transform, d3.zoomIdentity.translate(finalX, currentTransform.y).scale(currentTransform.k));
