@@ -31,21 +31,20 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
 
   useEffect(() => {
     const totalSegments = SEGMENT_COUNT;
-    const loaded = new Set<number>();
+    const loadedSegments: number[] = [];
     let hasError = false;
 
     const loadSegment = (index: number): Promise<void> => {
       return new Promise((resolve, reject) => {
         const img = new Image();
-        const segmentX = index * SEGMENT_WIDTH;
         
         img.src = bgImageUrl;
         
         img.onload = () => {
-          loaded.add(index);
-          setLoadedSegments(new Set(loaded));
+          loadedSegments.push(index);
+          setLoadedSegments(new Set(loadedSegments));
           
-          if (loaded.size === totalSegments) {
+          if (loadedSegments.length === totalSegments) {
             setBgImageSize({ width: img.width, height: img.height });
             setTimeout(() => {
               setIsImageLoaded(true);
@@ -56,7 +55,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         
         img.onerror = () => {
           hasError = true;
-          if (loaded.size === totalSegments || hasError) {
+          if (loadedSegments.length === totalSegments || hasError) {
             setBgImageSize({ width: SCROLL_WIDTH, height: SCROLL_HEIGHT });
             setTimeout(() => {
               setIsImageLoaded(true);
