@@ -24,16 +24,46 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const [lastInteractionTime, setLastInteractionTime] = useState(0);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const bgImageUrl = '/images/binfengtu_small.jpg';
+  // 最小加载时间（毫秒）
+  const MIN_LOAD_TIME = 20000;
+
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   useEffect(() => {
+    const startTime = Date.now();
     // 预加载长卷背景图
     const img = new Image();
     img.src = bgImageUrl;
+    
+    // 模拟进度条
+    const progressInterval = setInterval(() => {
+      const elapsedTime = Date.now() - startTime;
+      const progress = Math.min(99, Math.floor((elapsedTime / MIN_LOAD_TIME) * 100));
+      setLoadingProgress(progress);
+    }, 100);
+    
+    const finishLoading = () => {
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, MIN_LOAD_TIME - elapsedTime);
+      
+      setTimeout(() => {
+        clearInterval(progressInterval);
+        setLoadingProgress(100);
+        setIsImageLoaded(true);
+      }, remainingTime);
+    };
+
     img.onload = () => {
       setBgImageSize({ width: img.width, height: img.height });
-      setIsImageLoaded(true);
+      finishLoading();
     };
-    img.onerror = () => setIsImageLoaded(true); // 即使失败也允许显示（可能显示为空或颜色）
+    
+    img.onerror = () => {
+      // 即使失败也允许显示
+      finishLoading();
+    };
+
+    return () => clearInterval(progressInterval);
   }, []);
 
   useEffect(() => {
@@ -178,7 +208,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
             </div>
             <div className="text-center">
               <p className="text-[#c5a059] text-lg font-serif tracking-widest">正在加载长卷...</p>
-              <p className="text-[#f0e6d2]/40 text-sm mt-2">Loading Scroll</p>
+              <p className="text-[#f0e6d2]/40 text-sm mt-2">Loading Scroll {loadingProgress}%</p>
             </div>
           </div>
         </div>
