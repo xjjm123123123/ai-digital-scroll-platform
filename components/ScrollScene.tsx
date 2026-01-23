@@ -92,10 +92,12 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         const { x, y, k } = event.transform;
         
         const containerHeight = containerRef.current?.clientHeight || SCROLL_HEIGHT;
-        const containerWidth = containerRef.current?.clientWidth || SCROLL_WIDTH;
+        // 统一逻辑：保持高度占用容器的 80%，与初始加载逻辑一致
+        const targetHeight = containerHeight * 0.8;
+        const scale = targetHeight / ORIGINAL_HEIGHT;
         
-        const scale = (containerHeight * 0.25) / SCROLL_HEIGHT;
-        const offsetY = containerHeight * 0.1;
+        // 垂直居中偏移
+        const offsetY = (containerHeight - targetHeight) / 2;
         
         g.attr('transform', `translate(${x}, ${offsetY}) scale(${scale})`);
         
@@ -122,8 +124,11 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
     svg.call(zoom);
     
     const containerHeight = containerRef.current?.clientHeight || SCROLL_HEIGHT;
-    const scale = (containerHeight * 0.25) / SCROLL_HEIGHT;
-    const offsetY = containerHeight * 0.1;
+    // 统一初始化逻辑：80% 高度
+    const targetHeight = containerHeight * 0.8;
+    const scale = targetHeight / ORIGINAL_HEIGHT;
+    const offsetY = (containerHeight - targetHeight) / 2;
+    
     setDisplayScale(scale);
     svg.call(zoom.transform, d3.zoomIdentity.translate(0, offsetY).scale(1));
 
