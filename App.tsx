@@ -204,6 +204,7 @@ const App: React.FC = () => {
               isBounce={false} 
               resolution={0.75} 
               backgroundImage="/images/binfengtu_small.jpg"
+              bgScale={0.5}
               style={{ width: '100%', height: '100%' }}
             /> 
           </div>
