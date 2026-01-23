@@ -203,7 +203,7 @@ const App: React.FC = () => {
               autoIntensity={3.7} 
               isBounce={false} 
               resolution={0.75} 
-              backgroundImage="/images/binfengtu_small.jpg"
+              backgroundImage="/images/tiles/tile_0.jpg"
               style={{ width: '100%', height: '100%' }}
             /> 
           </div>

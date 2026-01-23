@@ -27,6 +27,16 @@ def slice_image(image_path, output_dir, num_slices=10):
         slice_img.save(output_path, quality=90)
         print(f"Saved {output_path} ({right-left}x{height})")
 
+    # Generate a thumbnail for the home screen
+    thumbnail_width = 2048
+    aspect_ratio = height / width
+    thumbnail_height = int(thumbnail_width * aspect_ratio)
+    
+    thumbnail = img.resize((thumbnail_width, thumbnail_height), Image.Resampling.LANCZOS)
+    thumbnail_path = os.path.join(output_dir, "thumbnail.jpg")
+    thumbnail.save(thumbnail_path, quality=85)
+    print(f"Saved thumbnail {thumbnail_path} ({thumbnail_width}x{thumbnail_height})")
+
 if __name__ == "__main__":
     image_path = "public/images/binfengtu_small.jpg"
     output_dir = "public/images/tiles"
