@@ -179,6 +179,29 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
     };
   }, [isDragging, lastInteractionTime]);
 
+  // 监听窗口大小变化和加载状态，更新缩放比例
+  useEffect(() => {
+    const updateScale = () => {
+      if (containerRef.current && isImageLoaded) {
+        // 计算缩放比例，使高度适应屏幕（留出上下边距）
+        const containerHeight = containerRef.current.clientHeight;
+        const targetHeight = containerHeight * 0.8; // 占用 80% 高度
+        // 确保 bgImageSize 已有值
+        if (bgImageSize.height > 0) {
+          const newScale = targetHeight / bgImageSize.height;
+          // 只有当差异显著时才更新，避免无限循环
+          if (Math.abs(newScale - displayScale) > 0.001) {
+            setDisplayScale(newScale);
+          }
+        }
+      }
+    };
+
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, [isImageLoaded, bgImageSize.height, displayScale]);
+
   useEffect(() => {
     if (externalPos && zoomRef.current && svgRef.current) {
       d3.select(svgRef.current)
@@ -225,16 +248,24 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
             width: bgImageSize.width,
             height: bgImageSize.height,
             transformOrigin: '0 0',
-            backgroundImage: 'url(/images/binfengtu_small.jpg)',
-            backgroundSize: 'contain',
-            backgroundPosition: 'center top',
-            backgroundRepeat: 'no-repeat',
             opacity: 0.9,
             willChange: 'transform',
             pointerEvents: 'none',
             transform: `translate3d(0px, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1}px, 0) scale(${displayScale})`
           }}
-        />
+        >
+          <img 
+            src="/images/binfengtu_small.jpg" 
+            alt="长卷背景" 
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block'
+            }}
+            draggable={false}
+          />
+        </div>
       )}
 
       {/* SVG 层 - 始终渲染以保持交互功能 */}
