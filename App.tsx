@@ -27,8 +27,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // 最小加载时间（毫秒）
-  const MIN_LOAD_TIME = 20000;
+  // 最小加载时间（毫秒）- 优化体验，保留 2秒 动画展示
+  const MIN_LOAD_TIME = 2000;
 
   // 资源预加载
   useEffect(() => {

@@ -30,8 +30,8 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const ORIGINAL_HEIGHT = 2773;
   const TILE_WIDTH = ORIGINAL_WIDTH / TILE_COUNT; // 6523
   
-  // 最小加载时间（毫秒）
-  const MIN_LOAD_TIME = 20000;
+  // 最小加载时间（毫秒）- 优化体验，保留 2秒 动画展示
+  const MIN_LOAD_TIME = 2000;
 
   const [loadingProgress, setLoadingProgress] = useState(0);
 
