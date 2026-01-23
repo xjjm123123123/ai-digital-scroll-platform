@@ -25,7 +25,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const bgImageUrl = '/images/binfengtu_small.jpg';
   // 最小加载时间（毫秒）
-  const MIN_LOAD_TIME = 15000;
+  const MIN_LOAD_TIME = 20000;
 
   const [loadingProgress, setLoadingProgress] = useState(0);
 
