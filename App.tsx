@@ -34,7 +34,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const startTime = Date.now();
     const imagesToLoad = [
-      '/images/binfengtu_small.jpg',
+      '/images/tiles/tile_0.jpg', // 仅预加载第一张切片
       '/images/logo/Simplification.svg'
     ];
 
@@ -204,7 +204,6 @@ const App: React.FC = () => {
               isBounce={false} 
               resolution={0.75} 
               backgroundImage="/images/binfengtu_small.jpg"
-              bgScale={0.5}
               style={{ width: '100%', height: '100%' }}
             /> 
           </div>

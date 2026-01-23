@@ -23,7 +23,13 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const [isDragging, setIsDragging] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState(0);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
-  const bgImageUrl = '/images/binfengtu_small.jpg';
+  
+  // 切片配置
+  const TILE_COUNT = 10;
+  const ORIGINAL_WIDTH = 65230;
+  const ORIGINAL_HEIGHT = 2773;
+  const TILE_WIDTH = ORIGINAL_WIDTH / TILE_COUNT; // 6523
+  
   // 最小加载时间（毫秒）
   const MIN_LOAD_TIME = 20000;
 
@@ -31,9 +37,6 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
 
   useEffect(() => {
     const startTime = Date.now();
-    // 预加载长卷背景图
-    const img = new Image();
-    img.src = bgImageUrl;
     
     // 模拟进度条
     const progressInterval = setInterval(() => {
@@ -53,8 +56,12 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
       }, remainingTime);
     };
 
+    // 预加载第一张切片以确认尺寸（虽然我们已经硬编码了）
+    const img = new Image();
+    img.src = '/images/tiles/tile_0.jpg';
+    
     img.onload = () => {
-      setBgImageSize({ width: img.width, height: img.height });
+      setBgImageSize({ width: ORIGINAL_WIDTH, height: ORIGINAL_HEIGHT });
       finishLoading();
     };
     
@@ -252,20 +259,32 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
             willChange: 'transform',
             pointerEvents: 'none',
             transform: `translate3d(0px, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1}px, 0) scale(${displayScale})`
-          }}
-        >
-          <img 
-            src="/images/binfengtu_small.jpg" 
-            alt="长卷背景" 
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              display: 'block'
-            }}
-            draggable={false}
-          />
-        </div>
+        }}
+      >
+        {Array.from({ length: TILE_COUNT }).map((_, index) => {
+          const tileWidth = Math.floor(ORIGINAL_WIDTH / TILE_COUNT);
+          const currentWidth = index === TILE_COUNT - 1 ? (ORIGINAL_WIDTH - index * tileWidth) : tileWidth;
+          const left = index * tileWidth;
+          
+          return (
+            <img 
+              key={index}
+              src={`/images/tiles/tile_${index}.jpg`} 
+              alt={`长卷切片 ${index}`} 
+              style={{
+                position: 'absolute',
+                left: `${left}px`,
+                top: 0,
+                width: `${currentWidth}px`,
+                height: '100%',
+                objectFit: 'contain',
+                display: 'block'
+              }}
+              draggable={false}
+            />
+          );
+        })}
+      </div>
       )}
 
       {/* SVG 层 - 始终渲染以保持交互功能 */}
