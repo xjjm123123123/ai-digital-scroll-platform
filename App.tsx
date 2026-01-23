@@ -25,13 +25,25 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<Hotspot[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+
+  // 最小加载时间（毫秒）
+  const MIN_LOAD_TIME = 10000;
 
   // 资源预加载
   useEffect(() => {
+    const startTime = Date.now();
     const imagesToLoad = [
       '/images/binfengtu_small.jpg',
       '/images/logo/Simplification.svg'
     ];
+
+    // 模拟进度条
+    const progressInterval = setInterval(() => {
+      const elapsedTime = Date.now() - startTime;
+      const progress = Math.min(99, Math.floor((elapsedTime / MIN_LOAD_TIME) * 100));
+      setLoadingProgress(progress);
+    }, 100);
 
     const loadImages = async () => {
       try {
@@ -44,15 +56,30 @@ const App: React.FC = () => {
           });
         });
         await Promise.all(promises);
-        // 最少展示 1.5s Loading，避免闪烁
-        setTimeout(() => setIsLoading(false), 1500);
+        
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, MIN_LOAD_TIME - elapsedTime);
+
+        setTimeout(() => {
+          clearInterval(progressInterval);
+          setLoadingProgress(100);
+          setIsLoading(false);
+        }, remainingTime);
+
       } catch (err) {
         console.error('Failed to load images', err);
-        setIsLoading(false);
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, MIN_LOAD_TIME - elapsedTime);
+        setTimeout(() => {
+          clearInterval(progressInterval);
+          setLoadingProgress(100);
+          setIsLoading(false);
+        }, remainingTime);
       }
     };
 
     loadImages();
+    return () => clearInterval(progressInterval);
   }, []);
 
   // 快捷键支持
@@ -151,8 +178,9 @@ const App: React.FC = () => {
             />
           </div>
         </div>
-        <div className="mt-12 text-[#c5a059] text-xl tracking-[0.8em] font-bold chinese-font opacity-80 animate-pulse ml-4">
-          载入中
+        <div className="mt-12 text-[#c5a059] text-xl tracking-[0.8em] font-bold chinese-font opacity-80 animate-pulse ml-4 text-center">
+          <div>载入中</div>
+          <div className="text-sm text-[#c5a059]/60 mt-2 font-serif tracking-[0.2em]">{loadingProgress}%</div>
         </div>
       </div>
     );
