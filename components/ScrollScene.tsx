@@ -162,7 +162,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         setIsAutoScrolling(true);
         
         const currentTransform = d3.zoomTransform(svgRef.current);
-        const scrollSpeed = 0.5;
+        const scrollSpeed = 1.5;
         // 向左滚动（x减小），查看右侧内容
         const newX = currentTransform.x - scrollSpeed * (deltaTime / 16.67);
         
