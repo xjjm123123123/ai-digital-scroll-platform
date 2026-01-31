@@ -23,7 +23,6 @@ export interface LiquidEtherProps {
   autoResumeDelay?: number;
   autoRampDuration?: number;
   backgroundImage?: string;
-  bgScale?: number;
 }
 
 interface SimOptions {
@@ -37,7 +36,6 @@ interface SimOptions {
   dt: number;
   isViscous: boolean;
   BFECC: boolean;
-  bgScale: number;
 }
 
 interface LiquidEtherWebGL {
@@ -78,8 +76,7 @@ export default function LiquidEther({
   takeoverDuration = 0.25,
   autoResumeDelay = 1000,
   autoRampDuration = 0.6,
-  backgroundImage,
-  bgScale = 1.0
+  backgroundImage
 }: LiquidEtherProps): React.ReactElement {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const webglRef = useRef<LiquidEtherWebGL | null>(null);
@@ -534,7 +531,6 @@ export default function LiquidEther({
 		uniform float uTextureAspect;
 		uniform float uViewAspect;
 		uniform float uScrollOffset;
-		uniform float uBgScale;
 		uniform vec4 bgColor;
 		varying vec2 uv;
 		void main(){
@@ -545,50 +541,39 @@ export default function LiquidEther({
 		if (uHasBackground) {
 				float screenAspect = uViewAspect;
 				float textureAspect = uTextureAspect;
-				float scale = uBgScale;
 				
 				// 核心逻辑：保持高度 1:1，计算宽度比例
 				// ratio 表示“屏幕宽度”占“图片原始比例下宽度”的百分比
-				// 引入 scale 后，图片显示高度 = 屏幕高度 * scale
-				float ratio = screenAspect / (textureAspect * scale);
+				float ratio = screenAspect / textureAspect;
 				
 				vec2 correctedUv;
 				
-				// Y轴缩放：将纹理映射到屏幕中间的 scale 区域
-				// correctedUv.y = (uv.y - 0.5) / scale + 0.5
-				// 当 scale < 1 时，uv.y 变化 1 单位，correctedUv.y 变化 > 1 单位，即显示更多纹理（缩小效果）？不对
-				// 当 scale < 1 时，图片在屏幕上变小。
-				// 屏幕 UV [0, 1]。图片占据屏幕 [0.5-s/2, 0.5+s/2]。
-				// 在这个范围内，我们需要采样纹理 [0, 1]。
-				// 设 y' = (y - (0.5 - s/2)) / s = (y - 0.5 + s/2) / s = (y - 0.5)/s + 0.5
-				correctedUv.y = (uv.y - 0.5) / scale + 0.5;
-
 				if (ratio < 1.0) {
 						correctedUv.x = uv.x * ratio + uScrollOffset;
+						correctedUv.y = uv.y;
 				} else {
 						// 宽屏模式：屏幕比图片宽，图片居中显示
 						correctedUv.x = (uv.x - 0.5) * ratio + 0.5;
+						correctedUv.y = uv.y;
 				}
 
 				// 采样背景图，并处理边界
-				// Y轴边界检查也很重要
-				if (correctedUv.y < 0.0 || correctedUv.y > 1.0 || correctedUv.x < 0.0 || correctedUv.x > 1.0) {
-						// 超出图片范围，显示透明或背景色
-						vec3 outRGB = mix(bgColor.rgb, c, lenv);
-						float outA = mix(bgColor.a, 1.0, lenv);
-						gl_FragColor = vec4(outRGB, outA);
-				} else {
-						vec4 texColor = texture2D(uBackground, correctedUv);
-						
-						// 增加背景图片亮度
-						texColor.rgb *= 1.5;
-						
-						// 遮罩逻辑
-						float mask = smoothstep(0.01, 0.25, lenv);
-						vec3 finalRGB = mix(bgColor.rgb, texColor.rgb, mask);
-						float finalA = mix(bgColor.a, texColor.a * mask, mask);
-						gl_FragColor = vec4(finalRGB, finalA);
+				vec2 clampedUv = clamp(correctedUv, vec2(0.0), vec2(1.0));
+				vec4 texColor = texture2D(uBackground, clampedUv);
+				
+				// 增加背景图片亮度
+				texColor.rgb *= 1.5;
+				
+				// 如果采样到了纹理之外，设置为透明或背景色
+				if (correctedUv.x < 0.0 || correctedUv.x > 1.0) {
+						texColor = vec4(0.0);
 				}
+				
+				// 遮罩逻辑
+				float mask = smoothstep(0.01, 0.25, lenv);
+				vec3 finalRGB = mix(bgColor.rgb, texColor.rgb, mask);
+				float finalA = mix(bgColor.a, texColor.a * mask, mask);
+				gl_FragColor = vec4(finalRGB, finalA);
 		} else {
 				vec3 outRGB = mix(bgColor.rgb, c, lenv);
 				float outA = mix(bgColor.a, 1.0, lenv);
@@ -978,7 +963,6 @@ export default function LiquidEther({
           dt: 0.014,
           isViscous: false,
           BFECC: true,
-          bgScale: 1.0,
           ...options
         };
         this.init();
@@ -1115,7 +1099,6 @@ export default function LiquidEther({
               uTextureAspect: { value: backgroundAspect },
               uViewAspect: { value: Common.aspect },
               uScrollOffset: { value: 0 },
-              uBgScale: { value: this.simulation.options.bgScale },
               bgColor: { value: bgVec4 }
             }
           })
@@ -1145,7 +1128,6 @@ export default function LiquidEther({
           this.output.material.uniforms.uTime.value = Common.time;
           
           const mat = this.output.material;
-          mat.uniforms.uBgScale.value = this.simulation.options.bgScale;
           
           if (Math.abs(mat.uniforms.uViewAspect.value - Common.aspect) > 0.001) {
             mat.uniforms.uViewAspect.value = Common.aspect;
@@ -1321,8 +1303,7 @@ export default function LiquidEther({
         dt,
         BFECC,
         resolution,
-        isBounce,
-        bgScale
+        isBounce
       });
       if (resolution !== prevRes) sim.resize();
     };
@@ -1396,8 +1377,7 @@ export default function LiquidEther({
     takeoverDuration,
     autoResumeDelay,
     autoRampDuration,
-    backgroundImage,
-    bgScale
+    backgroundImage
   ]);
 
   useEffect(() => {
@@ -1416,8 +1396,7 @@ export default function LiquidEther({
       dt,
       BFECC,
       resolution,
-      isBounce,
-      bgScale
+      isBounce
     });
     if (webgl.autoDriver) {
       webgl.autoDriver.enabled = autoDemo;

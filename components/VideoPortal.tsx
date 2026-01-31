@@ -8,14 +8,15 @@ interface VideoPortalProps {
   hotspot: Hotspot;
   onClose: () => void;
   onJumpTo: (target: Hotspot) => void;
-  activeMode: 'immersive' | 'interpret' | 'compare';
-  onModeChange: (m: 'immersive' | 'interpret' | 'compare') => void;
+  activeMode: 'immersive' | 'interpret';
+  onModeChange: (m: 'immersive' | 'interpret') => void;
 }
 
 const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, activeMode, onModeChange }) => {
   const [activeVersion, setActiveVersion] = useState<VideoVersion>(
     hotspot.versions?.[0] || { id: 'default', tag: '标准', url: hotspot.videoUrl, styleDesc: '默认生成效果' }
   );
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const [interpretation, setInterpretation] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -47,25 +48,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
         
         {/* 工具栏 */}
         <div className="absolute top-0 left-0 w-full z-[60] flex justify-between items-center px-8 py-6 pointer-events-none">
-          <div className="flex bg-white/5 p-1 rounded-sm border border-white/10 pointer-events-auto">
-            {[
-              { id: 'immersive', label: '沉浸' },
-              { id: 'interpret', label: '解读' },
-              { id: 'compare', label: '对比' }
-            ].map(m => (
-              <button 
-                key={m.id}
-                onClick={() => onModeChange(m.id as any)}
-                className={`text-[9px] tracking-[0.3em] px-4 py-1.5 transition-all ${
-                  activeMode === m.id ? 'bg-[#c5a059] text-black font-bold' : 'text-white/40 hover:text-white'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-          
-          <div className="flex items-center gap-6 pointer-events-auto">
+          <div className="flex items-center pointer-events-auto">
             <button 
               onClick={() => setIsSaved(!isSaved)}
               className={`text-[10px] tracking-widest flex items-center gap-2 transition-colors ${isSaved ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
@@ -73,31 +56,89 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
               {isSaved ? '已存档' : '收藏入卷'}
               <div className={`w-2 h-2 rounded-full border border-current ${isSaved ? 'bg-current' : ''}`} />
             </button>
-            <div className="h-4 w-[1px] bg-white/10" />
-            <button onClick={onClose} className="group p-2 flex items-center gap-2">
-              <span className="text-[10px] text-white/30 tracking-[0.2em] group-hover:text-white transition-colors">关闭</span>
-              <svg className="w-5 h-5 text-white/40 group-hover:text-white transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+          </div>
+          
+          <div className="flex items-center gap-6 pointer-events-auto">
+             <div className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full p-1 pl-2 gap-2 shadow-xl">
+               <div className="flex items-center gap-1">
+                  {[
+                    { id: 'immersive', label: '沉浸' },
+                    { id: 'interpret', label: '解读' }
+                  ].map(m => (
+                    <button 
+                      key={m.id}
+                      onClick={() => onModeChange(m.id as any)}
+                     className={`relative px-5 py-2 rounded-full text-[10px] tracking-[0.2em] transition-all duration-500 overflow-hidden ${
+                       activeMode === m.id 
+                         ? 'text-[#080808] font-bold shadow-[0_0_15px_rgba(197,160,89,0.4)]' 
+                         : 'text-white/40 hover:text-white hover:bg-white/5'
+                     }`}
+                   >
+                     {activeMode === m.id && (
+                       <div className="absolute inset-0 bg-gradient-to-r from-[#c5a059] to-[#e0c080] z-0" />
+                     )}
+                     <span className="relative z-10">{m.label}</span>
+                   </button>
+                 ))}
+               </div>
+               
+               <div className="w-[1px] h-4 bg-white/10 mx-2" />
+               
+               <button 
+                 onClick={onClose} 
+                 className="group w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors mr-1"
+               >
+                 <svg className="w-4 h-4 text-white/40 group-hover:text-white transition-all duration-300 group-hover:rotate-90 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" />
+                 </svg>
+               </button>
+             </div>
           </div>
         </div>
 
         {/* 视窗内容区 */}
         <div className="flex-[2.8] bg-black relative flex items-center justify-center overflow-hidden">
-          {activeMode === 'compare' && hotspot.originalImage ? (
-            <div className="relative w-full h-full flex animate-in slide-in-from-left duration-700">
-              <div className="flex-1 border-r border-white/5 relative overflow-hidden group">
-                 <img src={hotspot.originalImage} className="w-full h-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all duration-1000" />
-                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-8 flex items-end">
-                    <span className="text-xl text-white font-serif">古画原刻</span>
-                 </div>
+          {hotspot.carouselMedia && hotspot.carouselMedia.length > 0 ? (
+            <div className="relative w-full h-full flex items-center justify-center bg-[#050505] group">
+              {/* 轮播媒体 */}
+              <video 
+                key={hotspot.carouselMedia[carouselIndex]}
+                src={hotspot.carouselMedia[carouselIndex]}
+                className={`max-w-full max-h-full transition-transform duration-[2000ms] ${activeMode === 'immersive' ? 'scale-110' : 'scale-100'}`}
+                autoPlay loop muted playsInline
+                onTimeUpdate={handleTimeUpdate}
+              />
+              
+              {/* 轮播控件 */}
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                {hotspot.carouselMedia.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={(e) => { e.stopPropagation(); setCarouselIndex(idx); }}
+                    className={`w-2 h-2 rounded-full transition-all ${idx === carouselIndex ? 'bg-[#c5a059] w-6' : 'bg-white/30 hover:bg-white/60'}`}
+                  />
+                ))}
               </div>
-              <div className="flex-1 relative bg-black">
-                 <video src={activeVersion.url} autoPlay loop muted className="w-full h-full object-cover" />
-                 <div className="absolute bottom-10 right-10 flex flex-col items-end">
-                    <span className="text-[10px] text-[#c5a059]/60 tracking-[0.4em] uppercase">AI Kinetic Layer</span>
-                    <span className="text-xl text-[#c5a059] font-serif">重构 · 动态</span>
-                 </div>
-              </div>
+              
+              <button 
+                onClick={(e) => {
+                   e.stopPropagation();
+                   setCarouselIndex((prev) => (prev - 1 + hotspot.carouselMedia!.length) % hotspot.carouselMedia!.length);
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-4 text-white/20 hover:text-[#c5a059] transition-colors opacity-0 group-hover:opacity-100"
+              >
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              
+              <button 
+                onClick={(e) => {
+                   e.stopPropagation();
+                   setCarouselIndex((prev) => (prev + 1) % hotspot.carouselMedia!.length);
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-4 text-white/20 hover:text-[#c5a059] transition-colors opacity-0 group-hover:opacity-100"
+              >
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5l7 7-7 7" /></svg>
+              </button>
             </div>
           ) : (
             <div className="relative w-full h-full flex items-center justify-center bg-[#050505]">

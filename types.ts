@@ -42,6 +42,7 @@ export interface Hotspot {
   versions?: VideoVersion[];
   annotations?: Annotation[];
   relatedHotspotIds?: string[];
+  carouselMedia?: string[]; // 轮播视频/图片 URL 列表
 }
 
 export interface AppState {
@@ -50,5 +51,22 @@ export interface AppState {
   isPanning: boolean;
   scale: number;
   position: { x: number; y: number };
-  activeMode: 'immersive' | 'interpret' | 'compare';
+  activeMode: 'immersive' | 'interpret';
+}
+
+// RAG 相关类型
+export interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+export interface KnowledgeEntry {
+  id: string;
+  title: string;
+  content: string;
+  keywords: string[];
+  category: string;
+  tags?: string[];
 }

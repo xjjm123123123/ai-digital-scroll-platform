@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { SCROLL_WIDTH, SCROLL_HEIGHT, HOTSPOTS } from '../constants';
 import { Hotspot, HotspotLevel } from '../types';
+import { fetchHotspots } from '../src/lib/hotspotService';
 
 interface ScrollSceneProps {
   onHotspotClick: (hotspot: Hotspot) => void;
@@ -23,6 +24,21 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const [isDragging, setIsDragging] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState(0);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+  const [debugCoords, setDebugCoords] = useState<{x: number, y: number} | null>(null);
+  const [showDebug, setShowDebug] = useState(false); // 默认关闭调试模式
+  
+  // 数据库热点数据
+  const [hotspots, setHotspots] = useState<Hotspot[]>(HOTSPOTS);
+
+  useEffect(() => {
+    const loadHotspots = async () => {
+      const data = await fetchHotspots();
+      if (data && data.length > 0) {
+        setHotspots(data);
+      }
+    };
+    loadHotspots();
+  }, []);
   
   // 切片配置
   const TILE_COUNT = 10;
@@ -73,16 +89,59 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
     return () => clearInterval(progressInterval);
   }, []);
 
+  // 调试模式：处理鼠标移动和点击
+  const handleDebugMouseMove = (e: React.MouseEvent) => {
+    if (!showDebug || !svgRef.current || !containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // 获取当前的变换状态
+    const transform = d3.zoomTransform(svgRef.current);
+    const containerHeight = containerRef.current.clientHeight;
+    
+    // 重新计算当前的 scale 和 offsetY (逻辑同 d3 zoom)
+    const targetHeight = containerHeight * 0.8;
+    const scale = targetHeight / ORIGINAL_HEIGHT;
+    const offsetY = (containerHeight - targetHeight) / 2;
+
+    // 反向计算世界坐标
+    // transform: translate(transform.x, offsetY) scale(scale)
+    // screenX = transform.x + worldX * scale
+    // worldX = (screenX - transform.x) / scale
+    
+    const worldX = (mouseX - transform.x) / scale;
+    const worldY = (mouseY - offsetY) / scale;
+
+    // 转换为百分比
+    // 注意：这里需要根据 ORIGINAL_WIDTH/HEIGHT 计算百分比
+    // 因为渲染时是基于 ORIGINAL_WIDTH/HEIGHT 
+    const percentX = (worldX / ORIGINAL_WIDTH) * 100;
+    const percentY = (worldY / ORIGINAL_HEIGHT) * 100;
+
+    setDebugCoords({ x: percentX, y: percentY });
+  };
+
+  const handleDebugClick = () => {
+    if (!showDebug || !debugCoords) return;
+    const logMsg = `x: ${debugCoords.x.toFixed(2)}, y: ${debugCoords.y.toFixed(2)}`;
+    console.log(`%c [Coordinate] ${logMsg}`, 'color: #c5a059; font-weight: bold; font-size: 14px;');
+    // 可以选择复制到剪贴板
+    navigator.clipboard.writeText(logMsg).then(() => {
+        console.log('Copied to clipboard!');
+    }).catch(() => {});
+  };
+
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
 
     const svg = d3.select(svgRef.current);
     const g = svg.select('g');
-
+    
+    // 初始化 zoom 行为
     const zoom = d3.zoom()
       .scaleExtent([1, 1])
-      // 扩大拖拽范围，确保可以拖动到最右边，甚至稍微超出一点以便回弹体验
-      .translateExtent([[-SCROLL_WIDTH * 0.5, 0], [SCROLL_WIDTH * 1.5, SCROLL_HEIGHT]])
       .on('start', () => {
         setIsDragging(true);
         setLastInteractionTime(performance.now());
@@ -92,7 +151,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         const { x, y, k } = event.transform;
         
         const containerHeight = containerRef.current?.clientHeight || SCROLL_HEIGHT;
-        // 统一逻辑：保持高度占用容器的 80%，与初始加载逻辑一致
+        // 统一逻辑：保持高度占用容器的 80%
         const targetHeight = containerHeight * 0.8;
         const scale = targetHeight / ORIGINAL_HEIGHT;
         
@@ -122,15 +181,77 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
 
     zoomRef.current = zoom;
     svg.call(zoom);
-    
-    const containerHeight = containerRef.current?.clientHeight || SCROLL_HEIGHT;
-    // 统一初始化逻辑：80% 高度
-    const targetHeight = containerHeight * 0.8;
-    const scale = targetHeight / ORIGINAL_HEIGHT;
-    const offsetY = (containerHeight - targetHeight) / 2;
-    
-    setDisplayScale(scale);
-    svg.call(zoom.transform, d3.zoomIdentity.translate(0, offsetY).scale(1));
+
+    // 统一的更新尺寸函数
+    const updateDimensions = () => {
+      if (!containerRef.current || !zoomRef.current) return;
+
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
+      
+      const targetHeight = containerHeight * 0.8;
+      const scale = targetHeight / ORIGINAL_HEIGHT;
+      const offsetY = (containerHeight - targetHeight) / 2;
+      const renderedWidth = ORIGINAL_WIDTH * scale;
+
+      // 计算拖拽范围
+      // 允许向左拖动直到右边缘对齐屏幕右边缘 (containerWidth - renderedWidth)
+      // 允许向右拖动到 0 (左边缘对齐屏幕左边缘)
+      const minX = Math.min(0, containerWidth - renderedWidth);
+      const maxX = 0; 
+      const buffer = SCROLL_WIDTH * 0.1; // 增加一点缓冲区
+
+      // d3.zoom translateExtent 的逻辑是：
+      // 视口变换后的坐标必须在 extent 范围内。
+      // 对于平移 tx：
+      // containerWidth - x1 <= tx <= -x0
+      // 
+      // 我们想要: minX - buffer <= tx <= maxX + buffer
+      // 
+      // 所以:
+      // -x0 = maxX + buffer  =>  x0 = -(maxX + buffer)
+      // containerWidth - x1 = minX - buffer  =>  x1 = containerWidth - minX + buffer
+      
+      const x0 = -(maxX + buffer);
+      const x1 = containerWidth - minX + buffer;
+
+      // 更新 zoom 的 extent
+      zoomRef.current.translateExtent([
+        [x0, 0], 
+        [x1, containerHeight]
+      ]);
+
+      // 更新显示比例状态
+      setDisplayScale(scale);
+      
+      // 如果当前没有在拖动，可能需要重置位置或保持相对位置？
+      // 暂时只更新 extent，让 d3.zoom 处理约束
+    };
+
+    // 初始化调用
+    updateDimensions();
+
+    // 监听窗口大小变化
+    const resizeObserver = new ResizeObserver(() => {
+      updateDimensions();
+      // 强制触发一次 transform 更新以应用新的 scale
+      // 注意：这里可能需要获取当前的 transform 并重新应用
+      if (svgRef.current) {
+        const currentTransform = d3.zoomTransform(svgRef.current);
+        // 我们不改变 x，但由于 render 里的 transform 依赖 containerHeight 计算的 scale，
+        // 我们需要触发一次 zoom 事件或者手动更新 transform。
+        // 最简单的是通过 d3 发送一个无操作的 zoom 变换
+        svg.call(zoomRef.current.transform, currentTransform);
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    // 初始位置设置
+    const containerHeight = containerRef.current.clientHeight;
+    // 我们只需要把 zoom identity 重置，具体的 translateY 会在 render 中计算
+    // 关键是将 x 重置为 0
+    svg.call(zoom.transform, d3.zoomIdentity.translate(0, 0).scale(1));
 
     const handleMouseMove = () => {
       setLastInteractionTime(performance.now());
@@ -143,6 +264,8 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
       svg.on('.zoom', null);
       if (containerRef.current) {
         containerRef.current.removeEventListener('mousemove', handleMouseMove);
+        resizeObserver.unobserve(containerRef.current);
+        resizeObserver.disconnect();
       }
     };
   }, []);
@@ -169,7 +292,9 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         // 计算最大滚动距离（负值）
         // 视口宽度 - 内容实际宽度
         const containerWidth = containerRef.current?.clientWidth || 0;
-        const contentWidth = SCROLL_WIDTH * currentTransform.k;
+        // 使用实际渲染宽度计算边界
+        // 注意：currentTransform.k 始终为 1，实际缩放是 displayScale
+        const contentWidth = ORIGINAL_WIDTH * displayScale;
         const minX = containerWidth - contentWidth;
         
         // 如果滚动超出范围（比最小值还小），重置回 0
@@ -189,30 +314,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isDragging, lastInteractionTime]);
-
-  // 监听窗口大小变化和加载状态，更新缩放比例
-  useEffect(() => {
-    const updateScale = () => {
-      if (containerRef.current && isImageLoaded) {
-        // 计算缩放比例，使高度适应屏幕（留出上下边距）
-        const containerHeight = containerRef.current.clientHeight;
-        const targetHeight = containerHeight * 0.8; // 占用 80% 高度
-        // 确保 bgImageSize 已有值
-        if (bgImageSize.height > 0) {
-          const newScale = targetHeight / bgImageSize.height;
-          // 只有当差异显著时才更新，避免无限循环
-          if (Math.abs(newScale - displayScale) > 0.001) {
-            setDisplayScale(newScale);
-          }
-        }
-      }
-    };
-
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, [isImageLoaded, bgImageSize.height, displayScale]);
+  }, [isDragging, lastInteractionTime, displayScale]);
 
   useEffect(() => {
     if (externalPos && zoomRef.current && svgRef.current) {
@@ -226,13 +328,37 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
 
   // 语义 LOD 实现 - 缩放固定为1，简化可见性逻辑
   const isHotspotVisible = (level: HotspotLevel) => {
-    if (radarActive) return true;
-    // 缩放固定为1，显示所有热区
+    // 始终显示所有热区
     return true;
   };
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-[#080808] cursor-grab active:cursor-grabbing overflow-hidden relative">
+    <div 
+      ref={containerRef} 
+      className="w-full h-full bg-[#080808] cursor-grab active:cursor-grabbing overflow-hidden relative"
+      onMouseMove={handleDebugMouseMove}
+      onClick={handleDebugClick}
+    >
+      {/* 调试信息面板 */}
+      <div className="absolute top-24 left-4 z-[100] flex flex-col gap-2 pointer-events-none">
+        <div className="pointer-events-auto">
+             <button 
+                onClick={(e) => { e.stopPropagation(); setShowDebug(!showDebug); }}
+                className="bg-black/50 text-white/50 text-xs px-2 py-1 border border-white/10 hover:text-white hover:border-[#c5a059] transition-colors"
+             >
+                {showDebug ? '关闭调试' : '开启坐标调试'}
+             </button>
+        </div>
+        
+        {showDebug && debugCoords && (
+            <div className="bg-black/80 text-[#c5a059] p-3 rounded border border-[#c5a059]/30 text-xs font-mono backdrop-blur-sm">
+                <div>X: {debugCoords.x.toFixed(2)}%</div>
+                <div>Y: {debugCoords.y.toFixed(2)}%</div>
+                <div className="text-white/30 mt-1 scale-90 origin-left">点击复制到控制台</div>
+            </div>
+        )}
+      </div>
+
       {/* 加载界面 */}
       {!isImageLoaded && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#080808]">
@@ -295,11 +421,12 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
       {/* SVG 层 - 始终渲染以保持交互功能 */}
       <svg ref={svgRef} className={`w-full h-full absolute top-0 left-0 ${!isImageLoaded ? 'opacity-0' : ''}`} shapeRendering="optimizeSpeed">
         <g transform={`translate(0, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1})`}>
-          {HOTSPOTS.filter(h => isHotspotVisible(h.level)).map((h) => (
+          {hotspots.filter(h => isHotspotVisible(h.level)).map((h) => (
             <g 
               key={h.id} 
               className="cursor-pointer group animate-in fade-in duration-500" 
-              transform={`translate(${(h.x / 100) * SCROLL_WIDTH}, ${(h.y / 100) * SCROLL_HEIGHT})`}
+              // 使用 ORIGINAL_WIDTH/HEIGHT 确保热点位置与背景图对齐
+              transform={`translate(${(h.x / 100) * ORIGINAL_WIDTH}, ${(h.y / 100) * ORIGINAL_HEIGHT})`}
               onClick={() => onHotspotClick(h)}
             >
               {/* 热区边界 */}
