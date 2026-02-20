@@ -24,8 +24,6 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const [isDragging, setIsDragging] = useState(false);
   const [lastInteractionTime, setLastInteractionTime] = useState(0);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
-  const [debugCoords, setDebugCoords] = useState<{x: number, y: number} | null>(null);
-  const [showDebug, setShowDebug] = useState(false); // 默认关闭调试模式
   
   // 数据库热点数据
   const [hotspots, setHotspots] = useState<Hotspot[]>(HOTSPOTS);
@@ -88,50 +86,6 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
 
     return () => clearInterval(progressInterval);
   }, []);
-
-  // 调试模式：处理鼠标移动和点击
-  const handleDebugMouseMove = (e: React.MouseEvent) => {
-    if (!showDebug || !svgRef.current || !containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // 获取当前的变换状态
-    const transform = d3.zoomTransform(svgRef.current);
-    const containerHeight = containerRef.current.clientHeight;
-    
-    // 重新计算当前的 scale 和 offsetY (逻辑同 d3 zoom)
-    const targetHeight = containerHeight * 0.8;
-    const scale = targetHeight / ORIGINAL_HEIGHT;
-    const offsetY = (containerHeight - targetHeight) / 2;
-
-    // 反向计算世界坐标
-    // transform: translate(transform.x, offsetY) scale(scale)
-    // screenX = transform.x + worldX * scale
-    // worldX = (screenX - transform.x) / scale
-    
-    const worldX = (mouseX - transform.x) / scale;
-    const worldY = (mouseY - offsetY) / scale;
-
-    // 转换为百分比
-    // 注意：这里需要根据 ORIGINAL_WIDTH/HEIGHT 计算百分比
-    // 因为渲染时是基于 ORIGINAL_WIDTH/HEIGHT 
-    const percentX = (worldX / ORIGINAL_WIDTH) * 100;
-    const percentY = (worldY / ORIGINAL_HEIGHT) * 100;
-
-    setDebugCoords({ x: percentX, y: percentY });
-  };
-
-  const handleDebugClick = () => {
-    if (!showDebug || !debugCoords) return;
-    const logMsg = `x: ${debugCoords.x.toFixed(2)}, y: ${debugCoords.y.toFixed(2)}`;
-    console.log(`%c [Coordinate] ${logMsg}`, 'color: #c5a059; font-weight: bold; font-size: 14px;');
-    // 可以选择复制到剪贴板
-    navigator.clipboard.writeText(logMsg).then(() => {
-        console.log('Copied to clipboard!');
-    }).catch(() => {});
-  };
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -247,11 +201,15 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
 
     resizeObserver.observe(containerRef.current);
 
-    // 初始位置设置
+    // 初始位置设置 - 从画卷右边开始（画卷从右到左展开）
     const containerHeight = containerRef.current.clientHeight;
-    // 我们只需要把 zoom identity 重置，具体的 translateY 会在 render 中计算
-    // 关键是将 x 重置为 0
-    svg.call(zoom.transform, d3.zoomIdentity.translate(0, 0).scale(1));
+    const containerWidth = containerRef.current.clientWidth;
+    const targetHeight = containerHeight * 0.8;
+    const scale = targetHeight / ORIGINAL_HEIGHT;
+    const renderedWidth = ORIGINAL_WIDTH * scale;
+    const initialX = containerWidth - renderedWidth;
+    
+    svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, 0).scale(1));
 
     const handleMouseMove = () => {
       setLastInteractionTime(performance.now());
@@ -278,30 +236,25 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
       const deltaTime = currentTime - lastTime;
       lastTime = currentTime;
       
-      const timeSinceLastInteraction = lastInteractionTime === 0 ? 10001 : currentTime - lastInteractionTime;
-      const shouldAutoScroll = timeSinceLastInteraction > 10000 && !isDragging;
+      const shouldAutoScroll = !isDragging;
       
       if (shouldAutoScroll && zoomRef.current && svgRef.current) {
         setIsAutoScrolling(true);
         
         const currentTransform = d3.zoomTransform(svgRef.current);
-        const scrollSpeed = 7.5;
-        // 向左滚动（x减小），查看右侧内容
-        const newX = currentTransform.x - scrollSpeed * (deltaTime / 16.67);
-        
-        // 计算最大滚动距离（负值）
-        // 视口宽度 - 内容实际宽度
+        const scrollSpeed = 0.3;
         const containerWidth = containerRef.current?.clientWidth || 0;
-        // 使用实际渲染宽度计算边界
-        // 注意：currentTransform.k 始终为 1，实际缩放是 displayScale
         const contentWidth = ORIGINAL_WIDTH * displayScale;
         const minX = containerWidth - contentWidth;
         
-        // 如果滚动超出范围（比最小值还小），重置回 0
-        const finalX = newX < minX ? 0 : newX;
+        let newX = currentTransform.x + scrollSpeed * (deltaTime / 16.67);
+        
+        if (newX > 0) {
+          newX = minX;
+        }
         
         d3.select(svgRef.current)
-          .call(zoomRef.current.transform, d3.zoomIdentity.translate(finalX, currentTransform.y).scale(currentTransform.k));
+          .call(zoomRef.current.transform, d3.zoomIdentity.translate(newX, currentTransform.y).scale(currentTransform.k));
       }
       
       animationFrameId = requestAnimationFrame(animate);
@@ -314,7 +267,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isDragging, lastInteractionTime, displayScale]);
+  }, [isDragging, displayScale]);
 
   useEffect(() => {
     if (externalPos && zoomRef.current && svgRef.current) {
@@ -336,29 +289,7 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
     <div 
       ref={containerRef} 
       className="w-full h-full bg-[#080808] cursor-grab active:cursor-grabbing overflow-hidden relative"
-      onMouseMove={handleDebugMouseMove}
-      onClick={handleDebugClick}
     >
-      {/* 调试信息面板 */}
-      <div className="absolute top-24 left-4 z-[100] flex flex-col gap-2 pointer-events-none">
-        <div className="pointer-events-auto">
-             <button 
-                onClick={(e) => { e.stopPropagation(); setShowDebug(!showDebug); }}
-                className="bg-black/50 text-white/50 text-xs px-2 py-1 border border-white/10 hover:text-white hover:border-[#c5a059] transition-colors"
-             >
-                {showDebug ? '关闭调试' : '开启坐标调试'}
-             </button>
-        </div>
-        
-        {showDebug && debugCoords && (
-            <div className="bg-black/80 text-[#c5a059] p-3 rounded border border-[#c5a059]/30 text-xs font-mono backdrop-blur-sm">
-                <div>X: {debugCoords.x.toFixed(2)}%</div>
-                <div>Y: {debugCoords.y.toFixed(2)}%</div>
-                <div className="text-white/30 mt-1 scale-90 origin-left">点击复制到控制台</div>
-            </div>
-        )}
-      </div>
-
       {/* 加载界面 */}
       {!isImageLoaded && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#080808]">
@@ -421,50 +352,68 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
       {/* SVG 层 - 始终渲染以保持交互功能 */}
       <svg ref={svgRef} className={`w-full h-full absolute top-0 left-0 ${!isImageLoaded ? 'opacity-0' : ''}`} shapeRendering="optimizeSpeed">
         <g transform={`translate(0, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1})`}>
-          {hotspots.filter(h => isHotspotVisible(h.level)).map((h) => (
-            <g 
-              key={h.id} 
-              className="cursor-pointer group animate-in fade-in duration-500" 
-              // 使用 ORIGINAL_WIDTH/HEIGHT 确保热点位置与背景图对齐
-              transform={`translate(${(h.x / 100) * ORIGINAL_WIDTH}, ${(h.y / 100) * ORIGINAL_HEIGHT})`}
-              onClick={() => onHotspotClick(h)}
-            >
-              {/* 热区边界 */}
-              <rect 
-                width={h.width} 
-                height={h.height} 
-                fill={radarActive ? "rgba(197, 160, 89, 0.12)" : "rgba(197, 160, 89, 0.02)"} 
-                stroke={radarActive ? "rgba(197, 160, 89, 0.7)" : "rgba(197, 160, 89, 0.2)"} 
-                strokeWidth={radarActive ? "1.5" : "0.5"}
-                strokeDasharray={radarActive ? "none" : "3 3"}
-                className="transition-all duration-700 group-hover:fill-[#c5a059]/15 group-hover:stroke-[#c5a059]"
-              />
-              
-              {/* 四角笔触装饰 */}
-              <g className="opacity-40 group-hover:opacity-100 transition-opacity">
-                <path d="M 0 12 L 0 0 L 12 0" fill="none" stroke="#c5a059" strokeWidth="2" />
-                <path d={`M ${h.width - 12} 0 L ${h.width} 0 L ${h.width} 12`} fill="none" stroke="#c5a059" strokeWidth="2" />
-                <path d={`M 0 ${h.height - 12} L 0 ${h.height} 12 ${h.height}`} fill="none" stroke="#c5a059" strokeWidth="2" />
-                <path d={`M ${h.width - 12} ${h.height} L ${h.width} ${h.height} ${h.width} ${h.height - 12}`} fill="none" stroke="#c5a059" strokeWidth="2" />
-              </g>
-              
-              <foreignObject x="0" y={h.height + 6} width="300" height="80">
-                <div className="flex flex-col opacity-60 group-hover:opacity-100 transition-all group-hover:translate-x-1">
-                  <span className="text-[8px] text-[#c5a059] uppercase tracking-[0.4em] font-bold">{h.category}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`${h.level === HotspotLevel.CHAPTER ? 'text-2xl' : 'text-lg'} text-white font-serif leading-tight`}>
-                      {h.label}
-                    </span>
-                    {h.originalImage && <div className="red-seal scale-[0.6] origin-left -ml-2">对照</div>}
-                  </div>
-                </div>
-              </foreignObject>
+          {hotspots.filter(h => isHotspotVisible(h.level)).map((h) => {
+            const padding = 10;
+            const rectWidth = h.width + padding * 2;
+            const rectHeight = h.height + padding * 2;
+            const labelMap: Record<string, string> = {
+              'h-new-1': '狼跋',
+              'h-new-2': '九罭',
+              'h-new-3': '九罭',
+              'h-new-4': '伐柯',
+              'h-new-5': '破斧',
+              'h-new-6': '东山',
+              'h-new-7': '七月',
+              'h-new-8': '七月'
+            };
+            const displayLabel = labelMap[h.id] ?? h.label;
 
-              <div className="ink-pulse absolute" style={{ left: h.width/2, top: h.height/2 }}>
-                <div className="w-3 h-3 rounded-full bg-[#c5a059]" />
-              </div>
-            </g>
-          ))}
+            return (
+              <g 
+                key={h.id} 
+                className="cursor-pointer group animate-in fade-in duration-500" 
+                // 使用 ORIGINAL_WIDTH/HEIGHT 确保热点位置与背景图对齐
+                transform={`translate(${(h.x / 100) * ORIGINAL_WIDTH}, ${(h.y / 100) * ORIGINAL_HEIGHT})`}
+                onClick={() => onHotspotClick(h)}
+              >
+                {/* 热区边界 */}
+                <rect 
+                  x={-padding}
+                  y={-padding}
+                  width={rectWidth} 
+                  height={rectHeight} 
+                  fill={radarActive ? "rgba(197, 160, 89, 0.12)" : "rgba(197, 160, 89, 0.02)"} 
+                  stroke={radarActive ? "rgba(197, 160, 89, 0.7)" : "rgba(197, 160, 89, 0.2)"} 
+                  strokeWidth={radarActive ? "1.6" : "0.8"}
+                  strokeDasharray={radarActive ? "none" : "3 3"}
+                  className="transition-all duration-700 group-hover:fill-[#c5a059]/15 group-hover:stroke-[#c5a059] hotspot-blink"
+                />
+                
+                {/* 四角笔触装饰 */}
+                <g className="opacity-40 group-hover:opacity-100 transition-opacity hotspot-blink">
+                  <path d={`M ${-padding} ${-padding + 12} L ${-padding} ${-padding} L ${-padding + 12} ${-padding}`} fill="none" stroke="#c5a059" strokeWidth="2" />
+                  <path d={`M ${rectWidth - 12 - padding} ${-padding} L ${rectWidth - padding} ${-padding} L ${rectWidth - padding} ${-padding + 12}`} fill="none" stroke="#c5a059" strokeWidth="2" />
+                  <path d={`M ${-padding} ${rectHeight - 12 - padding} L ${-padding} ${rectHeight - padding} ${-padding + 12} ${rectHeight - padding}`} fill="none" stroke="#c5a059" strokeWidth="2" />
+                  <path d={`M ${rectWidth - 12 - padding} ${rectHeight - padding} L ${rectWidth - padding} ${rectHeight - padding} ${rectWidth - padding} ${rectHeight - 12 - padding}`} fill="none" stroke="#c5a059" strokeWidth="2" />
+                </g>
+                
+                <foreignObject x="0" y={rectHeight + 6 - padding} width="300" height="80">
+                  <div className="flex flex-col opacity-60 group-hover:opacity-100 transition-all group-hover:translate-x-1 hotspot-blink">
+                    <div className="flex items-center gap-2">
+                      <span className={`${h.level === HotspotLevel.CHAPTER ? 'text-2xl' : 'text-lg'} text-white font-serif leading-tight`}>
+                        {displayLabel}
+                      </span>
+                      {h.originalImage && <div className="red-seal scale-[0.6] origin-left -ml-2">对照</div>}
+                    </div>
+                  </div>
+                </foreignObject>
+
+                <div className="ink-pulse absolute" style={{ left: rectWidth / 2 - padding, top: rectHeight / 2 - padding }}>
+                  <div className="w-3 h-3 rounded-full bg-[#c5a059]" />
+                </div>
+              </g>
+            );
+          })}
         </g>
         {/* <defs>
         </defs> */}

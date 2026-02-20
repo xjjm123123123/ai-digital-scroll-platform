@@ -43,6 +43,9 @@ export interface Hotspot {
   annotations?: Annotation[];
   relatedHotspotIds?: string[];
   carouselMedia?: string[]; // 轮播视频/图片 URL 列表
+  subtitle?: string; // 副标题
+  background?: string; // 背景说明
+  contentDetail?: string; // 详细内容
 }
 
 export interface AppState {

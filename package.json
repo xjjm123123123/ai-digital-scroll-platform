@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
+    "@playwright/test": "^1.58.2",
     "@supabase/supabase-js": "^2.93.2",
     "d3": "^7.9.0",
     "dotenv": "^17.2.3",

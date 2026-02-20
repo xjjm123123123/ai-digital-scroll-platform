@@ -1,36 +1,46 @@
 import React, { useRef, useState } from 'react';
 
 const BackgroundView: React.FC = () => {
-  // Scroll container ref for potential programmatic scrolling
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeSection, setActiveSection] = useState<number>(0);
 
-  const tiles = Array.from({ length: 10 }, (_, i) => `https://raw.githubusercontent.com/xjjm123123123/ai-digital-scroll-platform/main/public/images/tiles/tile_${i}.jpg`);
+  const tiles = Array.from({ length: 10 }, (_, i) => `/images/tiles/tile_${i}.jpg`);
 
-  const seasons = [
+  const odes = [
     {
-      title: "春 · 载阳",
-      subtitle: "一之日觱发，一之日于耜",
-      desc: "画卷开篇，春风拂过豳地。农夫们开始修补农具，整理田垄。画面中可见人物或扛锄而行，或牵牛耕地，嫩绿的柳色与初升的暖阳交相辉映，充满了勃勃生机。",
-      color: "#8FA876" // Spring Green
+      title: "七月",
+      subtitle: "农事总纲 · 衣食之源",
+      desc: "《七月》是《豳风》中最长的一篇，也是全卷的核心。诗人以通俗流畅的语言，按季节顺序记述了农夫一年四季的耕作、蚕桑、打猎、修缮房屋等劳动生活，以及祭祀、燕飨等活动，宛如一幅宏大的周代社会风俗画卷。"
     },
     {
-      title: "夏 · 鸣蜩",
-      subtitle: "四月秀葽，五月鸣蜩",
-      desc: "盛夏时节，万物生长。采桑女忙碌于桑林之间，养蚕缫丝。这一段不仅描绘了男耕女织的辛劳，更细致刻画了古代独特的蚕桑文化，人物衣纹飘逸，神态专注。",
-      color: "#BF7A6F" // Summer Red/Warm
+      title: "鸱鸮",
+      subtitle: "喻意保孤 · 王业艰难",
+      desc: "借一只母鸟在鸱鸮（猫头鹰）抓走幼鸟后，辛勤修补巢穴的故事，比喻周公在流言蜚语中竭力维护周王朝的统一和安定，保护年幼的成王，体现了周公的忠心与苦心。"
     },
     {
-      title: "秋 · 获稻",
-      subtitle: "八月剥枣，十月获稻",
-      desc: "金秋是收获的季节。画卷展现了壮观的收割场景：割稻、打场、堆垛。沉甸甸的谷穗压弯了腰，农人们脸上洋溢着丰收的喜悦，打谷场上一片繁忙热闹。",
-      color: "#D9A03A" // Autumn Gold
+      title: "东山",
+      subtitle: "征人怀乡 · 情真意切",
+      desc: "描述了周公东征三年后，士兵在归途中对家乡亲人的思念之情。诗中既有对战争艰苦的回忆，又有对家乡景物和妻子的深切怀念，情感真挚动人。"
     },
     {
-      title: "冬 · 同庆",
-      subtitle: "九月授衣，朋酒斯飨",
-      desc: "冬日农闲，人们缝制新衣，酿造春酒，举行祭祀与宴饮。画面转入室内或庭院，展现了“跻彼公堂，称彼兕觥”的宗族欢庆场面，这是对一年辛劳的慰藉，也是礼乐文明的体现。",
-      color: "#8C9BAB" // Winter Blue/Grey
+      title: "破斧",
+      subtitle: "哀叹征役 · 民生疾苦",
+      desc: "通过描写斧柄折断、斧刃缺损，反映了随周公东征的士兵长年征战的劳苦和对和平生活的渴望，同时也赞颂了周公东征平定祸乱的功绩。"
+    },
+    {
+      title: "伐柯",
+      subtitle: "遵循礼法 · 婚姻之仪",
+      desc: "以砍伐斧柄需要依样画葫芦为起兴，阐述了迎娶妻子需要媒妁之言的道理，同时也隐喻了治理国家需要遵循法度，任用贤能。"
+    },
+    {
+      title: "九罭",
+      subtitle: "访贤求隐 · 君臣际会",
+      desc: "描写了周公在微服私访中，看到渔夫在河中设网捕鱼的情景，表达了周公求贤若渴、礼贤下士的态度，以及君臣遇合的喜悦。"
+    },
+    {
+      title: "狼跋",
+      subtitle: "进退维谷 · 德音不瑕",
+      desc: "以老狼进退两难的窘态起兴，赞美周公在艰难处境中依然保持美德，即使面临流言蜚语和政治困境，也能从容应对，最终感化世人。"
     }
   ];
 
@@ -44,9 +54,6 @@ const BackgroundView: React.FC = () => {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#c5a059] opacity-5 blur-[120px] rounded-full pointer-events-none" />
 
           <div className="relative z-10 space-y-6">
-            <div className="inline-block border border-[#c5a059]/30 px-4 py-1 rounded-full backdrop-blur-md mb-4 animate-fade-in">
-              <span className="text-xs font-serif text-[#c5a059] tracking-[0.3em] uppercase">The Odes of Bin by Ma Hezhi</span>
-            </div>
             <h1 className="text-5xl md:text-7xl font-serif text-[#f0e6d2] tracking-wider drop-shadow-2xl">
               关于<span className="text-[#c5a059] mx-2">《豳风图》</span>
             </h1>
@@ -65,7 +72,7 @@ const BackgroundView: React.FC = () => {
             </div>
             {/* Decorative Scroll Hint */}
             <div className="hidden md:flex items-center space-x-2 text-white/30 text-xs tracking-widest animate-pulse">
-              <span>SCROLL</span>
+              <span>滑动</span>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
             </div>
           </div>
@@ -96,40 +103,35 @@ const BackgroundView: React.FC = () => {
           </div>
         </section>
 
-        {/* Deep Dive Content - Four Seasons Analysis */}
+        {/* Deep Dive Content */}
         <div className="px-8 max-w-6xl mx-auto space-y-32">
 
-          {/* Intro Text Block */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
-            <div className="md:col-span-4 sticky top-10">
-              <h3 className="text-4xl font-serif text-[#f0e6d2] leading-tight mb-6">
-                以画证史<br />
-                <span className="text-[#c5a059] text-2xl">见证周代社会的缩影</span>
-              </h3>
-              <div className="w-12 h-[2px] bg-[#c5a059] mb-6" />
-              <p className="text-white/60 text-sm leading-7 text-justify">
-                《豳风图》全卷布局宏大，从右至左展开。马和之巧妙地运用时空转换的艺术手法，将不同季节、不同地点的农事活动安排在同一画面中。正如《石渠宝笈》所言：“虽然以七月为名，实则备载四时之景。”
-              </p>
+          {/* The Seven Odes */}
+          <section>
+            <div className="text-center mb-16">
+              <h3 className="text-3xl font-serif text-[#f0e6d2] mb-4">豳风七篇 · 史诗华章</h3>
+              <p className="text-white/40 text-sm tracking-widest">全卷七段，段段皆为经典</p>
             </div>
-
-            <div className="md:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-              {seasons.map((season, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white/[0.02] border border-white/5 p-8 rounded-xl hover:bg-white/[0.04] hover:border-[#c5a059]/30 transition-all duration-300 group"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-xl font-serif text-[#f0e6d2] group-hover:text-[#c5a059] transition-colors">{season.title}</h4>
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: season.color }} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {odes.map((ode, idx) => (
+                <div key={idx} className="relative group overflow-hidden rounded-lg bg-[#1a1815] border border-[#c5a059]/10 hover:border-[#c5a059]/40 transition-all duration-500">
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/90 z-10" />
+                  <img 
+                    src={tiles[idx % tiles.length]} 
+                    alt={ode.title}
+                    className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50 group-hover:scale-105 transition-all duration-700"
+                  />
+                  <div className="relative z-20 p-6 h-full flex flex-col justify-end">
+                    <h4 className="text-2xl font-serif text-[#c5a059] mb-2">{ode.title}</h4>
+                    <p className="text-white/60 text-xs italic mb-4 border-l-2 border-[#c5a059] pl-2">{ode.subtitle}</p>
+                    <p className="text-white/50 text-xs leading-relaxed opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 delay-100">
+                      {ode.desc}
+                    </p>
                   </div>
-                  <p className="text-[#c5a059] text-xs font-serif mb-4 opacity-70 italic">{season.subtitle}</p>
-                  <p className="text-white/60 text-sm leading-relaxed text-justify">
-                    {season.desc}
-                  </p>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
           {/* Artistic Feature Highlight - Ma Hezhi */}
           <section className="relative rounded-2xl overflow-hidden border border-[#c5a059]/20">
@@ -141,10 +143,10 @@ const BackgroundView: React.FC = () => {
               <div className="space-y-6">
                 <h3 className="text-3xl font-serif text-[#f0e6d2]">画圣遗韵：蚂蝗描</h3>
                 <p className="text-white/70 leading-relaxed font-light">
-                  全卷笔法高古，虽设色绚丽，却无脂粉俗气。马和之运用其标志性的“蚂蝗描”，线条似断还连，粗细变化随心所欲，恰如其分地表现了衣纹的质感与人物的动态。这种“逸笔草草”而又神形兼备的画风，在南宋院体画中独树一帜。
+                  全卷笔法高古，虽设色绚丽，却无脂粉俗气。马和之运用其标志性的"蚂蝗描"，线条似断还连，粗细变化随心所欲，恰如其分地表现了衣纹的质感与人物的动态。这种"逸笔草草"而又神形兼备的画风，在南宋院体画中独树一帜。
                 </p>
                 <blockquote className="border-l-2 border-[#c5a059] pl-6 py-2 my-8 text-white/50 italic font-serif">
-                  “和之作画，务去华藻，自成一家。” —— 《画继》
+                  "和之作画，务去华藻，自成一家。" —— 《画继》
                 </blockquote>
               </div>
               <div className="relative h-64 w-full bg-black/50 rounded-lg border border-white/10 flex items-center justify-center overflow-hidden">
@@ -158,6 +160,7 @@ const BackgroundView: React.FC = () => {
               </div>
             </div>
           </section>
+
         </div>
 
         {/* Footer */}

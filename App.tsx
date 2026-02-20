@@ -8,6 +8,7 @@ import MethodView from './components/MethodView';
 import BackgroundView from './components/BackgroundView';
 import LiquidEther from './components/LiquidEther';
 import RagChat from './components/RagChat';
+import BGMPlayer from './components/BGMPlayer';
 import { AppState, Hotspot } from './types';
 import { SCROLL_WIDTH } from './constants';
 
@@ -163,7 +164,7 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, selectedHotspot: null }));
   }, []);
 
-  const handleVideoModeChange = useCallback((m: string) => {
+  const handleVideoModeChange = useCallback((m: AppState['activeMode']) => {
     setState(prev => ({ ...prev, activeMode: m }));
   }, []);
 
@@ -235,9 +236,9 @@ const App: React.FC = () => {
             </div>
 
             <p className="text-white/40 text-lg leading-loose tracking-[0.4em] font-serif italic max-w-2xl mx-auto border-y border-[#c5a059]/10 py-10">
-              “七月流火，九月授衣。” <br />
-              穿梭于千年前的诗经长卷，点选意象，<br />
-              见证静态笔触被 AI 赋予生命的瞬间。
+              "七月流火，九月授衣。" <br />
+              展开长卷，仿佛推开一扇通往西周的窗；<br />
+              没有金戈铁马的喧嚣，只有草木生长的呼吸。
             </p>
 
             <button
@@ -247,10 +248,6 @@ const App: React.FC = () => {
               <div className="absolute inset-0 bg-[#c5a059] -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out" />
               <span className="relative z-10 text-lg">入 卷 探 幽</span>
             </button>
-
-            <div className="text-[9px] text-white/20 tracking-[0.3em] uppercase pt-12 animate-in fade-in slide-in-from-bottom-2 duration-1000 delay-500">
-              快捷键引导：[R] 探测区域 · [F] 锁定比例 · [P] 历史足迹 · [ESC] 退出
-            </div>
           </div>
         </div>
       )}
@@ -271,52 +268,59 @@ const App: React.FC = () => {
 
           {/* 控制面板 */}
           <div className="fixed bottom-10 left-10 flex gap-4 pointer-events-auto">
-            <div className="glass-panel p-5 flex gap-10 items-center border-[#c5a059]/20 shadow-2xl">
+            <div className="glass-panel p-6 flex gap-12 items-center border-[#c5a059]/20 shadow-2xl">
               <div className="flex flex-col min-w-[120px]">
-                <div className="text-[9px] text-white/30 tracking-widest uppercase mb-1">当前叙事段落</div>
-                <span className="text-xl text-[#f0e6d2] font-serif tracking-widest">
-                  {state.position.x < -SCROLL_WIDTH * 0.7 ? '隆冬 · 授衣' :
-                    state.position.x < -SCROLL_WIDTH * 0.4 ? '仲秋 · 剥枣' :
-                      '孟春 · 于耜'}
+                <div className="text-[10px] text-white/30 tracking-widest uppercase mb-2">当前叙事段落</div>
+                <span className="text-2xl text-[#f0e6d2] font-serif tracking-widest">
+                  {(() => {
+                    const progress = Math.abs(state.position.x) / SCROLL_WIDTH;
+                    if (progress < 1/7) return '狼跋';
+                    if (progress < 2/7) return '九罭';
+                    if (progress < 3/7) return '伐柯';
+                    if (progress < 4/7) return '破斧';
+                    if (progress < 5/7) return '东山';
+                    if (progress < 6/7) return '鸱鸮';
+                    return '七月';
+                  })()}
                 </span>
               </div>
-              <div className="h-10 w-[1px] bg-white/10" />
-              <div className="flex gap-6">
+              <div className="h-12 w-[1px] bg-white/10" />
+              <div className="flex gap-8">
                 <button
                   onClick={handleRadarClick}
-                  className={`flex flex-col items-center gap-1 transition-all ${radarActive ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
+                  className={`flex flex-col items-center gap-2 transition-all ${radarActive ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
                 >
-                  <div className="w-5 h-5 border border-current rounded-full flex items-center justify-center">
-                    <div className="w-1 h-1 bg-current rounded-full" />
+                  <div className="w-7 h-7 border border-current rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-current rounded-full" />
                   </div>
-                  <span className="text-[8px] tracking-tighter">探测(R)</span>
+                  <span className="text-[10px] tracking-wide">探测(R)</span>
                 </button>
                 <button
                   onClick={handleHistoryClick}
-                  className={`flex flex-col items-center gap-1 transition-all ${showHistory ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
+                  className={`flex flex-col items-center gap-2 transition-all ${showHistory ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
                 >
-                  <div className="w-5 h-5 border border-current rounded p-[3px] flex flex-col gap-[2px]">
-                    <div className="h-[1px] w-full bg-current" />
-                    <div className="h-[1px] w-2/3 bg-current" />
+                  <div className="w-7 h-7 border border-current rounded p-[4px] flex flex-col gap-[3px]">
+                    <div className="h-[2px] w-full bg-current" />
+                    <div className="h-[2px] w-2/3 bg-current" />
                   </div>
-                  <span className="text-[8px] tracking-tighter">足迹(P)</span>
+                  <span className="text-[10px] tracking-wide">足迹(P)</span>
                 </button>
               </div>
             </div>
 
             {showHistory && (
-              <div className="glass-panel p-4 w-48 animate-in slide-in-from-bottom-4 duration-300">
-                <div className="text-[9px] text-[#c5a059] mb-3 tracking-widest border-b border-[#c5a059]/10 pb-1">最近浏览</div>
+              <div className="glass-panel p-5 w-56 animate-in slide-in-from-bottom-4 duration-300">
+                <div className="text-[10px] text-[#c5a059] mb-4 tracking-widest border-b border-[#c5a059]/10 pb-2">最近浏览</div>
                 <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
                   {history.length > 0 ? history.map(h => (
                     <button
                       key={h.id}
                       onClick={() => handleHistoryItemClick(h)}
-                      className="w-full text-left text-[11px] text-white/60 hover:text-[#c5a059] transition-colors truncate font-serif"
+                      className="w-full text-left text-[12px] text-white/60 hover:text-[#c5a059] transition-colors truncate font-serif"
                     >
                       · {h.label}
                     </button>
-                  )) : <div className="text-[10px] text-white/20 italic">尚无足迹</div>}
+                  )) : <div className="text-[11px] text-white/20 italic">尚无足迹</div>}
                 </div>
               </div>
             )}
@@ -339,6 +343,9 @@ const App: React.FC = () => {
 
       {/* RAG 智能助手 */}
       <RagChat />
+
+      {/* 背景音乐播放器 */}
+      <BGMPlayer />
     </Layout>
   );
 };

@@ -15,14 +15,16 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
     { id: 'method', label: '术理' },
   ];
 
+  const showNavBackground = currentView !== 'home';
+
   return (
     <div className="relative w-full h-screen overflow-hidden flex flex-col select-none">
       {/* 顶部导航 */}
-      <nav className="absolute top-0 left-0 w-full z-50 flex justify-between items-center px-8 py-6 pointer-events-none">
+      <nav className={`absolute top-0 left-0 w-full z-50 flex justify-between items-center px-8 py-6 pointer-events-none transition-all duration-500 ${showNavBackground ? 'bg-black/80 backdrop-blur-md' : ''}`}>
         <div className="flex items-center gap-4 pointer-events-auto cursor-pointer" onClick={() => onNavigate('home')}>
-          <div className="w-12 h-12 flex items-center justify-center">
+          <div className="w-8 h-8 flex items-center justify-center">
             <img 
-              src="/images/logo/logo.png" 
+              src="/images/logo/Simplification.svg" 
               alt="Logo" 
               className="w-full h-full object-contain" 
             />
@@ -51,12 +53,6 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
       <main className="flex-1 w-full h-full relative">
         {children}
       </main>
-
-      {/* 底部信息 */}
-      <div className="absolute bottom-6 left-8 z-40 text-[10px] text-white/30 tracking-widest pointer-events-none font-serif">
-        数字遗产重构 × AI 生成艺术 <br />
-        《豳风图》数字化研究项目
-      </div>
     </div>
   );
 };

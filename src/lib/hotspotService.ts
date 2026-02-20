@@ -22,6 +22,9 @@ interface DBHotspot {
   annotations?: any;
   related_hotspot_ids?: string[];
   carousel_media?: string[];
+  subtitle?: string;
+  background?: string;
+  content_detail?: string;
 }
 
 // Convert DB format to Application format
@@ -43,6 +46,9 @@ const mapDBToHotspot = (dbHotspot: DBHotspot): Hotspot => ({
   annotations: dbHotspot.annotations,
   relatedHotspotIds: dbHotspot.related_hotspot_ids,
   carouselMedia: dbHotspot.carousel_media,
+  subtitle: dbHotspot.subtitle,
+  background: dbHotspot.background,
+  contentDetail: dbHotspot.content_detail,
 });
 
 // Convert Application format to DB format
@@ -64,6 +70,9 @@ const mapHotspotToDB = (hotspot: Hotspot): DBHotspot => ({
   annotations: hotspot.annotations,
   related_hotspot_ids: hotspot.relatedHotspotIds,
   carousel_media: hotspot.carouselMedia,
+  subtitle: hotspot.subtitle,
+  background: hotspot.background,
+  content_detail: hotspot.contentDetail,
 });
 
 export const fetchHotspots = async (): Promise<Hotspot[]> => {

@@ -12,6 +12,75 @@ interface VideoPortalProps {
   onModeChange: (m: 'immersive' | 'interpret') => void;
 }
 
+const CHAPTER_CONTENT_MAP: Record<string, { label: string; subtitle: string; background: string; contentDetail: string }> = {
+  'h-new-8': {
+    label: '七月',
+    subtitle: '华夏最早的农事历书',
+    background: '地位：全诗共八章，是《诗经·国风》中最长的作品。',
+    contentDetail: '以时间为经，以生产生活为纬。从一月的寒风刺骨写到腊月的凿冰祭祀，详尽记录了西周时期豳地农民的一年：春天耕种采桑，夏天锄草消暑，秋天收获染丝，冬天修屋捕猎。它不仅是文学作品，更是研究先周社会结构、物候历法、劳动工具及饮食服饰极其珍贵的史料。'
+  },
+  'h-new-7': {
+    label: '七月',
+    subtitle: '华夏最早的农事历书',
+    background: '地位：全诗共八章，是《诗经·国风》中最长的作品。',
+    contentDetail: '以时间为经，以生产生活为纬。从一月的寒风刺骨写到腊月的凿冰祭祀，详尽记录了西周时期豳地农民的一年：春天耕种采桑，夏天锄草消暑，秋天收获染丝，冬天修屋捕猎。它不仅是文学作品，更是研究先周社会结构、物候历法、劳动工具及饮食服饰极其珍贵的史料。'
+  },
+  'h-new-6': {
+    label: '东山',
+    subtitle: '战争创伤下的归家之情',
+    background: '描写随周公东征三年后复员回乡的士兵。',
+    contentDetail: '全诗通过士兵在归途中的心理独白，展现了极高的艺术感染力。第一章写行军之苦；第二章想象家乡房屋荒芜、鹇鹄啼叫的凄凉；第三章转而想象新婚妻子在家苦苦等候的情景。这种"未到家先想家"的虚实结合手法，开启了后世边塞诗和征夫诗的先河。'
+  },
+  'h-new-5': {
+    label: '破斧',
+    subtitle: '凯旋后的苦涩与荣耀',
+    background: '周公东征胜利，将士们即将解甲归田。',
+    contentDetail: '诗歌反复咏叹"既破我斧，又缺我斨"，通过兵器的残破侧面印证了战争的残酷与漫长。虽然武器毁坏了，但将士们对周公能够平定四方、带给他们安宁生活表示了深深的敬意和爱戴，反映了底层士兵在战后复杂的心境。'
+  },
+  'h-new-4': {
+    label: '伐柯',
+    subtitle: '婚姻制度的礼法标准',
+    background: '确立社会契约与周礼的象征。',
+    contentDetail: '以"砍树做斧柄"这一日常劳动为喻，提出核心观点：砍木头需要斧头，娶妻子必须通过媒妁。如果没有旧的斧柄做参考，就做不出新的斧柄；如果没有中介和礼仪，婚姻就不合法。这体现了当时社会已经进入了高度重视契约和礼法的文明阶段。'
+  },
+  'h-new-3': {
+    label: '九罭',
+    subtitle: '周初的政治礼仪',
+    background: '描写公卿（一说周公）巡视地方时的盛大欢迎场面。',
+    contentDetail: '"九罭"指拥有九个网眼的捕鱼大网。诗中以捕获大鱼（鳟、鲂）为起兴，象征着国家的贤才得以任用。随后笔锋转到丰盛的宴席和主宾之间热情的款待，展现了西周初期统治阶层内部和睦、礼贤下士的政治风气。'
+  },
+  'h-new-2': {
+    label: '九罭',
+    subtitle: '周初的政治礼仪',
+    background: '描写公卿（一说周公）巡视地方时的盛大欢迎场面。',
+    contentDetail: '"九罭"指拥有九个网眼的捕鱼大网。诗中以捕获大鱼（鳟、鲂）为起兴，象征着国家的贤才得以任用。随后笔锋转到丰盛的宴席和主宾之间热情的款待，展现了西周初期统治阶层内部和睦、礼贤下士的政治风气。'
+  },
+  'h-new-1': {
+    label: '狼跋',
+    subtitle: '困境中的威仪与德行',
+    background: '针对诽谤周公的言论进行的辩护。',
+    contentDetail: '诗中生动描绘了一只老狼进退两难的窘态：前行则踩到胡须，后退则被尾巴绊倒。这象征了周公在权位与流言之间的艰难处境。但诗歌笔锋一转，赞美周公即便在如此窘境下，依然能够保持赤色的鞋履和优雅的仪态，表现出一种不随波逐流、坚守道德准则的高贵格调。'
+  }
+};
+
+const getChapterContent = (hotspot: Hotspot) => {
+  const mapped = CHAPTER_CONTENT_MAP[hotspot.id];
+  if (mapped) {
+    return {
+      label: mapped.label,
+      subtitle: hotspot.subtitle || mapped.subtitle,
+      background: hotspot.background || mapped.background,
+      contentDetail: hotspot.contentDetail || mapped.contentDetail
+    };
+  }
+  return {
+    label: hotspot.label,
+    subtitle: hotspot.subtitle || '',
+    background: hotspot.background || '',
+    contentDetail: hotspot.contentDetail || ''
+  };
+};
+
 const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, activeMode, onModeChange }) => {
   const [activeVersion, setActiveVersion] = useState<VideoVersion>(
     hotspot.versions?.[0] || { id: 'default', tag: '标准', url: hotspot.videoUrl, styleDesc: '默认生成效果' }
@@ -19,6 +88,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [interpretation, setInterpretation] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -34,8 +104,16 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
     setActiveVersion(hotspot.versions?.[0] || { id: 'default', tag: '标准', url: hotspot.videoUrl, styleDesc: '默认生成效果' });
   }, [hotspot]);
 
+  useEffect(() => {
+    setVideoLoading(true);
+  }, [activeVersion.url, hotspot.carouselMedia?.[carouselIndex]]);
+
   const handleTimeUpdate = () => {
     if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
+  };
+
+  const handleVideoLoaded = () => {
+    setVideoLoading(false);
   };
 
   const relatedHotspots = (hotspot.relatedHotspotIds || [])
@@ -98,6 +176,17 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
 
         {/* 视窗内容区 */}
         <div className="flex-[2.8] bg-black relative flex items-center justify-center overflow-hidden">
+          {videoLoading && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#050505]">
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <div className="w-12 h-12 border-2 border-[#c5a059]/20 rounded-full"></div>
+                  <div className="absolute top-0 left-0 w-12 h-12 border-2 border-[#c5a059] rounded-full border-t-transparent animate-spin"></div>
+                </div>
+                <span className="text-[10px] text-white/30 tracking-widest">加载中</span>
+              </div>
+            </div>
+          )}
           {hotspot.carouselMedia && hotspot.carouselMedia.length > 0 ? (
             <div className="relative w-full h-full flex items-center justify-center bg-[#050505] group">
               {/* 轮播媒体 */}
@@ -107,6 +196,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
                 className={`max-w-full max-h-full transition-transform duration-[2000ms] ${activeMode === 'immersive' ? 'scale-110' : 'scale-100'}`}
                 autoPlay loop muted playsInline
                 onTimeUpdate={handleTimeUpdate}
+                onLoadedData={handleVideoLoaded}
               />
               
               {/* 轮播控件 */}
@@ -148,6 +238,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
                 className={`max-w-full max-h-full transition-transform duration-[2000ms] ${activeMode === 'immersive' ? 'scale-110' : 'scale-100'}`}
                 autoPlay loop muted playsInline
                 onTimeUpdate={handleTimeUpdate}
+                onLoadedData={handleVideoLoaded}
               />
               
               {/* 语义注释 */}
@@ -179,19 +270,30 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
 
         {/* 侧边信息栏 */}
         <div className={`flex-1 flex flex-col border-l border-white/5 overflow-hidden bg-[#080808] transition-all duration-700 ${activeMode === 'immersive' ? 'translate-x-full opacity-0 w-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}>
-          <div className="p-8 h-full overflow-y-auto no-scrollbar space-y-12">
+          <div className="p-8 pt-20 h-full overflow-y-auto no-scrollbar space-y-12">
             
-            <div className="flex items-center gap-2 text-[8px] text-white/20 tracking-widest uppercase">
-              <span>全卷</span> <span className="opacity-40">/</span> 
-              <span>{hotspot.season}</span> <span className="opacity-40">/</span> 
-              <span className="text-[#c5a059]">{hotspot.category}</span>
-            </div>
-
             <section>
-              <h2 className="text-4xl font-serif text-[#f0e6d2] leading-tight mb-4">{hotspot.label}</h2>
-              <p className="text-sm text-white/50 leading-loose font-serif italic text-justify">
-                {hotspot.description}
-              </p>
+              <h2 className="text-4xl font-serif text-[#f0e6d2] leading-tight mb-2">{getChapterContent(hotspot).label}</h2>
+              {getChapterContent(hotspot).subtitle && (
+                <p className="text-lg text-[#c5a059] font-serif tracking-wide mb-4">《{getChapterContent(hotspot).label}》：{getChapterContent(hotspot).subtitle}</p>
+              )}
+              {getChapterContent(hotspot).background && (
+                <div className="mb-4 p-4 bg-white/[0.02] border-l-2 border-[#c5a059]/30">
+                  <p className="text-xs text-white/60 leading-relaxed font-serif">
+                    <span className="text-[#c5a059] font-bold">背景：</span>{getChapterContent(hotspot).background}
+                  </p>
+                </div>
+              )}
+              {getChapterContent(hotspot).contentDetail && (
+                <p className="text-sm text-white/70 leading-loose font-serif text-justify">
+                  {getChapterContent(hotspot).contentDetail}
+                </p>
+              )}
+              {!getChapterContent(hotspot).contentDetail && (
+                <p className="text-sm text-white/50 leading-loose font-serif italic text-justify">
+                  {hotspot.description}
+                </p>
+              )}
             </section>
 
             {interpretation && (

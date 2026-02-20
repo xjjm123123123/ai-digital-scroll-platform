@@ -38,12 +38,12 @@ const MiniMap: React.FC<MiniMapProps> = ({ x, viewWidth, onJump }) => {
           }}
         />
 
-        {/* 季节标记 */}
+        {/* 篇章标记 */}
         <div className="absolute top-0 left-2 h-full flex items-center pointer-events-none">
-          <span className="text-[9px] text-white/40 tracking-widest">初春</span>
+          <span className="text-[9px] text-white/40 tracking-widest">狼跋</span>
         </div>
         <div className="absolute top-0 right-2 h-full flex items-center pointer-events-none">
-          <span className="text-[9px] text-white/40 tracking-widest">隆冬</span>
+          <span className="text-[9px] text-white/40 tracking-widest">七月</span>
         </div>
       </div>
       
