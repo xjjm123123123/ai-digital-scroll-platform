@@ -27,6 +27,12 @@ interface DBHotspot {
   content_detail?: string;
 }
 
+const normalizeHotspotLabel = (id: string, label: string) => {
+  if (id === 'h-new-1' && label === '狼步') return '狼跋';
+  if (label === '狼步') return '狼跋';
+  return label;
+};
+
 // Convert DB format to Application format
 const mapDBToHotspot = (dbHotspot: DBHotspot): Hotspot => ({
   id: dbHotspot.id,
@@ -34,7 +40,7 @@ const mapDBToHotspot = (dbHotspot: DBHotspot): Hotspot => ({
   y: dbHotspot.y,
   width: dbHotspot.width,
   height: dbHotspot.height,
-  label: dbHotspot.label,
+  label: normalizeHotspotLabel(dbHotspot.id, dbHotspot.label),
   category: dbHotspot.category,
   season: dbHotspot.season as Season,
   level: dbHotspot.level as HotspotLevel,
