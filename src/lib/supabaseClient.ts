@@ -1,13 +1,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Load environment variables
-const supabaseUrl = 'https://bwbhoiykyolpcbjaxqmk.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://bwbhoiykyolpcbjaxqmk.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable__1qJC58dAWEsS5_0VT3MOA_Uldpjd21';
 
-if (!supabaseAnonKey) {
-  console.warn('Supabase credentials missing! Please check your .env file.');
+if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  console.warn('VITE_SUPABASE_ANON_KEY not set in environment, using default value');
 }
 
-// Create a single supabase client for interacting with your database
-export const supabase = createClient(supabaseUrl, supabaseAnonKey || '');
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
