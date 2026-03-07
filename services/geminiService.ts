@@ -1,12 +1,9 @@
-import { GoogleGenAI } from '@google/genai';
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+const API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || '';
 
 if (!API_KEY) {
-    console.warn('⚠️ VITE_GEMINI_API_KEY 未配置，RAG 助手将无法正常工作');
+    console.warn('⚠️ VITE_DEEPSEEK_API_KEY 未配置，RAG 助手将无法正常工作');
 }
-
-const genAI = new GoogleGenAI({ apiKey: API_KEY });
 
 // 系统提示词 - 定义 AI 助手的角色和行为
 const SYSTEM_PROMPT = `你是豳风图数字长卷平台的智能导览助手。你的职责是：
@@ -29,7 +26,7 @@ export interface ChatOptions {
 }
 
 /**
- * 调用 Gemini API 生成回答
+ * 调用 DeepSeek API 生成回答
  * @param userMessage 用户的问题
  * @param options 配置选项
  * @returns AI 生成的回答
@@ -41,29 +38,40 @@ export async function generateResponse(
     try {
         const { context = '', temperature = 0.7 } = options;
 
-        // 构建完整的提示词
-        let fullPrompt = `${SYSTEM_PROMPT}\n\n`;
+        // 构建消息列表
+        const messages = [
+            { role: 'system', content: SYSTEM_PROMPT }
+        ];
 
+        let finalUserMessage = userMessage;
         if (context) {
-            fullPrompt += `参考以下知识库内容回答问题：\n\n${context}\n\n---\n\n`;
+            finalUserMessage = `参考以下知识库内容回答问题：\n\n${context}\n\n---\n\n用户问题：${userMessage}`;
         }
+        
+        messages.push({ role: 'user', content: finalUserMessage });
 
-        fullPrompt += `用户问题：${userMessage}`;
-
-        // 调用 Gemini API
-        // 不设置 maxOutputTokens，使用模型默认值（通常很大）
-        // 系统提示词已包含在 fullPrompt 中
-        const response = await genAI.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: fullPrompt,
-            config: {
-                temperature,
-                topP: 0.95,
-                topK: 40,
+        // 调用 DeepSeek API
+        const response = await fetch('https://api.deepseek.com/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${API_KEY}`
             },
+            body: JSON.stringify({
+                model: 'deepseek-chat',
+                messages: messages,
+                temperature: temperature,
+                stream: false
+            })
         });
 
-        const text = response.text;
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`API error: ${response.status} ${JSON.stringify(errorData)}`);
+        }
+
+        const data = await response.json();
+        const text = data.choices?.[0]?.message?.content;
 
         if (!text) {
             throw new Error('AI 未返回有效回答');
@@ -72,15 +80,15 @@ export async function generateResponse(
         return text;
 
     } catch (error: any) {
-        console.error('Gemini API 调用失败:', error);
+        console.error('DeepSeek API 调用失败:', error);
 
         // 友好的错误提示
-        if (error.message?.includes('API_KEY') || error.message?.includes('apiKey')) {
-            return '抱歉，AI 服务配置有误。请检查 API Key 设置。';
+        if (error.message?.includes('401')) {
+            return '抱歉，API Key 无效或未配置。请检查设置。';
         }
 
-        if (error.message?.includes('quota')) {
-            return '抱歉，API 调用次数已达上限，请稍后再试。';
+        if (error.message?.includes('402') || error.message?.includes('balance')) {
+            return '抱歉，API 余额不足，请充值后重试。';
         }
 
         if (error.message?.includes('network') || error.message?.includes('fetch')) {
