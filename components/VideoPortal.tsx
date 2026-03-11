@@ -257,15 +257,6 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
               ))}
             </div>
           )}
-
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 backdrop-blur-md">
-               <div className="flex flex-col items-center gap-6">
-                  <div className="w-10 h-10 border border-[#c5a059]/20 border-t-[#c5a059] rounded-full animate-spin"></div>
-                  <span className="text-[10px] text-[#c5a059] tracking-[0.5em] uppercase animate-pulse">正在唤醒此景意象...</span>
-               </div>
-            </div>
-          )}
         </div>
 
         {/* 侧边信息栏 */}
@@ -296,7 +287,20 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
               )}
             </section>
 
-            {interpretation && (
+            {loading ? (
+              <section className="space-y-4 animate-pulse opacity-50">
+                <div className="h-4 w-24 bg-[#c5a059]/10 rounded mb-4" />
+                <div className="space-y-2">
+                  <div className="h-3 w-full bg-white/5 rounded" />
+                  <div className="h-3 w-5/6 bg-white/5 rounded" />
+                  <div className="h-3 w-4/6 bg-white/5 rounded" />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <div className="h-5 w-16 bg-[#c5a059]/10 rounded" />
+                  <div className="h-5 w-12 bg-[#c5a059]/10 rounded" />
+                </div>
+              </section>
+            ) : interpretation && (
               <section className="space-y-4">
                 <h3 className="text-[9px] text-[#c5a059] tracking-[0.3em] uppercase flex items-center gap-3">
                   <div className="h-[1px] w-6 bg-current" />
