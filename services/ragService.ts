@@ -27,49 +27,82 @@ export async function loadKnowledgeBase(): Promise<void> {
 }
 
 /**
- * 简单的关键词匹配检索
- * @param query 用户查询
- * @param topK 返回最相关的 K 条结果
- * @returns 相关的知识库条目
+ * RAG 检索匹配判定维度与评分权重设计
+ * 
+ * 1. 热点标题绝对匹配 (+10分) - 核心锚点
+ *    - 目的：确保针对特定场景核心意象的提问能精准召回关联词条。
+ *    - 机制：当用户查询完全包含标题，或标题完全包含用户查询时触发。
+ *    - 赋予最高置信度，直接锁定核心内容。
+ * 
+ * 2. 正文关键词散布匹配 (+5分/词) - 关键实体捕获
+ *    - 目的：构建广泛的实体召回网络，捕获自然语言提问中的关键实体（如农具、服饰）。
+ *    - 机制：遍历词条的关键词列表，每命中一个查询中的关键词即累加分数。
+ * 
+ * 3. 模糊内容包含匹配 (+3分) - 长尾兜底
+ *    - 目的：作为高分匹配落空时的系统兜底策略。
+ *    - 机制：基于子串包含关系的弱相关性召回，确保即使未命中关键词也能通过全文检索找到相关内容。
+ * 
+ * 4. 全局分类/标签匹配 (+2分) - 次级上下文
+ *    - 目的：利用元数据标签将相近文化属性的知识条目聚类，提供充实的文化背景。
+ *    - 机制：当查询涉及分类或标签时给予少量加分，辅助提升相关领域内容的排名。
  */
-export function searchKnowledge(query: string, topK: number = 3): KnowledgeEntry[] {
+export function searchKnowledge(query: string, topK: number = 5): KnowledgeEntry[] {
     if (!isLoaded || knowledgeBase.length === 0) {
         return [];
     }
 
+    const queryLower = query.toLowerCase().trim();
+    if (!queryLower) return [];
+
     // 计算每个条目的相关性分数
     const scored = knowledgeBase.map(entry => {
         let score = 0;
-        const queryLower = query.toLowerCase();
-
-        // 标题匹配（权重最高）
-        if (entry.title.toLowerCase().includes(queryLower)) {
+        const titleLower = entry.title.toLowerCase();
+        const contentLower = entry.content.toLowerCase();
+        const categoryLower = entry.category.toLowerCase();
+        
+        // 1. 热点标题绝对匹配 (+10 分)
+        // 核心锚点：确保核心意象精准召回
+        // 逻辑：双向包含匹配 - 查询包含标题 或 标题包含查询（且查询有一定长度避免误配）
+        if (queryLower.includes(titleLower) || (titleLower.includes(queryLower) && queryLower.length > 1)) {
             score += 10;
         }
 
-        // 关键词匹配
-        entry.keywords.forEach(keyword => {
-            if (queryLower.includes(keyword.toLowerCase()) ||
-                keyword.toLowerCase().includes(queryLower)) {
-                score += 5;
-            }
-        });
+        // 2. 正文关键词散布匹配 (+5 分 / 命中词)
+        // 关键实体捕获：构建实体召回网络
+        // 逻辑：统计命中的关键词数量
+        if (entry.keywords && Array.isArray(entry.keywords)) {
+            entry.keywords.forEach(keyword => {
+                const keywordLower = keyword.toLowerCase();
+                // 仅当查询包含关键词时加分，避免反向包含（如查询“人”匹配关键词“工具人”及其它包含人的词）带来的噪音
+                if (queryLower.includes(keywordLower)) {
+                    score += 5;
+                }
+            });
+        }
 
-        // 内容匹配
-        if (entry.content.toLowerCase().includes(queryLower)) {
+        // 3. 模糊内容包含匹配 (+3 分)
+        // 长尾兜底：弱相关性召回机制
+        // 逻辑：全文检索包含
+        if (contentLower.includes(queryLower) && queryLower.length > 1) {
             score += 3;
         }
 
-        // 分类和标签匹配
-        if (entry.category.toLowerCase().includes(queryLower)) {
+        // 4. 全局分类/标签匹配 (+2 分)
+        // 次级上下文：文化属性聚类
+        // 逻辑：分类或标签命中
+        if (categoryLower.includes(queryLower)) {
             score += 2;
         }
 
-        entry.tags?.forEach(tag => {
-            if (queryLower.includes(tag.toLowerCase())) {
-                score += 2;
-            }
-        });
+        if (entry.tags && Array.isArray(entry.tags)) {
+            entry.tags.forEach(tag => {
+                const tagLower = tag.toLowerCase();
+                if (queryLower.includes(tagLower)) {
+                    score += 2;
+                }
+            });
+        }
 
         return { entry, score };
     });

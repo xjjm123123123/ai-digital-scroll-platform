@@ -12,6 +12,27 @@ import BGMPlayer from './components/BGMPlayer';
 import { AppState, Hotspot } from './types';
 import { SCROLL_WIDTH } from './constants';
 
+const HOTSPOT_LABEL_MAP: Record<string, string> = {
+  '场景一': '狼跋',
+  '场景二': '九罭',
+  '场景三': '九罭',
+  '场景四': '伐柯',
+  '场景五': '破斧',
+  '场景六': '东山',
+  '场景七': '七月',
+  '场景八': '七月',
+};
+
+const getHotspotDisplayLabel = (hotspot: Hotspot): string => {
+  if (HOTSPOT_LABEL_MAP[hotspot.label]) {
+    return HOTSPOT_LABEL_MAP[hotspot.label];
+  }
+  if (hotspot.label.startsWith('场景')) {
+    return hotspot.label;
+  }
+  return hotspot.label;
+};
+
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     currentView: 'home',
@@ -318,7 +339,7 @@ const App: React.FC = () => {
                       onClick={() => handleHistoryItemClick(h)}
                       className="w-full text-left text-[12px] text-white/60 hover:text-[#c5a059] transition-colors truncate font-serif"
                     >
-                      · {h.label}
+                      · {getHotspotDisplayLabel(h)}{h.subtitle ? `：${h.subtitle}` : ''}
                     </button>
                   )) : <div className="text-[11px] text-white/20 italic">尚无足迹</div>}
                 </div>

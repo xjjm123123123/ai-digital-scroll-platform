@@ -1,9 +1,27 @@
 
+/**
+ * 双轨视频门户组件
+ * 
+ * 功能特性：
+ * 1. 全屏视频门户 - 触发热点后跨越DOM层级升起全屏视窗
+ * 2. 双轨模式切换 - 支持"沉浸模式"与"解读模式"的无缝切换
+ * 3. 时序监听钩子 - 视频播放至特定关键帧时，画面浮现半透明语义标注框
+ * 4. 边缘滑入面板 - 解读模式下，图文解析面板由边缘滑入
+ */
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Hotspot, HotspotLevel, VideoVersion } from '../types';
 import { interpretScene } from '../services/gemini';
 import { HOTSPOTS } from '../constants';
 
+/**
+ * VideoPortal 组件 Props 接口
+ * @param hotspot - 当前激活的热点对象
+ * @param onClose - 关闭门户的回调函数
+ * @param onJumpTo - 跳转到其他热点的回调函数
+ * @param activeMode - 当前模式：'immersive'(沉浸模式) | 'interpret'(解读模式)
+ * @param onModeChange - 模式切换回调函数
+ */
 interface VideoPortalProps {
   hotspot: Hotspot;
   onClose: () => void;
@@ -12,6 +30,10 @@ interface VideoPortalProps {
   onModeChange: (m: 'immersive' | 'interpret') => void;
 }
 
+/**
+ * 篇章内容映射表
+ * 存储《诗经》各篇章的详细信息，用于解读模式下的内容展示
+ */
 const CHAPTER_CONTENT_MAP: Record<string, { label: string; subtitle: string; background: string; contentDetail: string }> = {
   'h-new-8': {
     label: '七月',
@@ -63,6 +85,12 @@ const CHAPTER_CONTENT_MAP: Record<string, { label: string; subtitle: string; bac
   }
 };
 
+/**
+ * 获取篇章内容
+ * 优先使用映射表中的内容，备选使用热点对象的内容
+ * @param hotspot - 热点对象
+ * @returns 篇章的标签、副标题、背景和详细内容
+ */
 const getChapterContent = (hotspot: Hotspot) => {
   const mapped = CHAPTER_CONTENT_MAP[hotspot.id];
   if (mapped) {
@@ -81,18 +109,46 @@ const getChapterContent = (hotspot: Hotspot) => {
   };
 };
 
+/**
+ * 双轨视频门户主组件
+ * 
+ * 核心功能说明：
+ * - 全屏覆盖：使用 fixed inset-0 z-[100] 实现跨越DOM层级的全屏门户
+ * - 沉浸模式：视频放大显示(scale-110)，隐藏侧边栏，提供沉浸式观看体验
+ * - 解读模式：视频还原大小(scale-100)，侧边栏从右侧滑入，显示图文解析
+ * - 时序监听：通过 onTimeUpdate 钩子监听视频播放时间，动态显示语义标注
+ */
 const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, activeMode, onModeChange }) => {
+  // 当前激活的视频版本
   const [activeVersion, setActiveVersion] = useState<VideoVersion>(
     hotspot.versions?.[0] || { id: 'default', tag: '标准', url: hotspot.videoUrl, styleDesc: '默认生成效果' }
   );
+  
+  // 轮播媒体当前索引
   const [carouselIndex, setCarouselIndex] = useState(0);
+  
+  // AI 语义解读数据
   const [interpretation, setInterpretation] = useState<any>(null);
+  
+  // 加载状态
   const [loading, setLoading] = useState(false);
+  
+  // 视频加载状态
   const [videoLoading, setVideoLoading] = useState(true);
+  
+  // 当前视频播放时间（秒）- 用于时序监听关键帧
   const [currentTime, setCurrentTime] = useState(0);
+  
+  // 收藏/存档状态
   const [isSaved, setIsSaved] = useState(false);
+  
+  // 视频元素引用 - 用于获取当前播放时间
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  /**
+   * 组件挂载时加载AI语义解读
+   * 调用 gemini 服务获取当前场景的文化语义分析
+   */
   useEffect(() => {
     const loadInterpret = async () => {
       setLoading(true);
@@ -101,31 +157,52 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
       setLoading(false);
     };
     loadInterpret();
+    // 重置视频版本为第一个
     setActiveVersion(hotspot.versions?.[0] || { id: 'default', tag: '标准', url: hotspot.videoUrl, styleDesc: '默认生成效果' });
   }, [hotspot]);
 
+  /**
+   * 切换视频版本或轮播媒体时触发视频加载状态
+   */
   useEffect(() => {
     setVideoLoading(true);
   }, [activeVersion.url, hotspot.carouselMedia?.[carouselIndex]]);
 
+  /**
+   * 时序监听钩子 - 视频播放时间更新回调
+   * 
+   * 核心功能：每当视频播放时间更新时，捕获当前时间戳
+   * 应用场景：用于判断是否到达关键帧，从而显示/隐藏语义标注框
+   * 实现原理：通过 video 元素的 currentTime 属性获取当前播放位置
+   */
   const handleTimeUpdate = () => {
     if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
   };
 
+  /**
+   * 视频加载完成回调
+   * 隐藏加载状态，显示视频内容
+   */
   const handleVideoLoaded = () => {
     setVideoLoading(false);
   };
 
+  /**
+   * 获取相关热点列表
+   * 根据 relatedHotspotIds 查找对应的热点对象
+   */
   const relatedHotspots = (hotspot.relatedHotspotIds || [])
     .map(id => HOTSPOTS.find(h => h.id === id))
     .filter(Boolean) as Hotspot[];
 
   return (
+    // 全屏门户容器 - 跨越DOM层级，使用 z-index: 100 置顶
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/95 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-700">
       <div className={`relative w-full max-w-7xl h-full max-h-[90vh] flex flex-col md:flex-row glass-panel rounded-sm border-white/10 overflow-hidden shadow-[0_0_150px_rgba(197,160,89,0.1)]`}>
         
-        {/* 工具栏 */}
+        {/* 工具栏 - 包含收藏按钮和模式切换 */}
         <div className="absolute top-0 left-0 w-full z-[60] flex justify-between items-center px-8 py-6 pointer-events-none">
+          {/* 收藏/存档按钮 */}
           <div className="flex items-center pointer-events-auto">
             <button 
               onClick={() => setIsSaved(!isSaved)}
@@ -136,9 +213,12 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
             </button>
           </div>
           
+          {/* 模式切换与关闭按钮区域 */}
           <div className="flex items-center gap-6 pointer-events-auto">
+             {/* 模式切换按钮组 - 沉浸/解读双轨切换 */}
              <div className="flex items-center bg-black/40 backdrop-blur-md border border-white/10 rounded-full p-1 pl-2 gap-2 shadow-xl">
                <div className="flex items-center gap-1">
+                  {/* 模式选项：沉浸模式 / 解读模式 */}
                   {[
                     { id: 'immersive', label: '沉浸' },
                     { id: 'interpret', label: '解读' }
@@ -152,6 +232,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
                          : 'text-white/40 hover:text-white hover:bg-white/5'
                      }`}
                    >
+                     {/* 选中状态下的渐变背景 */}
                      {activeMode === m.id && (
                        <div className="absolute inset-0 bg-gradient-to-r from-[#c5a059] to-[#e0c080] z-0" />
                      )}
@@ -160,8 +241,10 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
                  ))}
                </div>
                
+               {/* 分隔线 */}
                <div className="w-[1px] h-4 bg-white/10 mx-2" />
                
+               {/* 关闭按钮 */}
                <button 
                  onClick={onClose} 
                  className="group w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors mr-1"
@@ -174,8 +257,9 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
           </div>
         </div>
 
-        {/* 视窗内容区 */}
+        {/* 视窗内容区 - 视频/轮播媒体展示区域 */}
         <div className="flex-[2.8] bg-black relative flex items-center justify-center overflow-hidden">
+          {/* 视频加载中状态 - 显示加载动画 */}
           {videoLoading && (
             <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#050505]">
               <div className="flex flex-col items-center gap-4">
@@ -187,19 +271,23 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
               </div>
             </div>
           )}
+          
+          {/* 条件渲染：优先显示轮播媒体（多视频），否则显示单个视频 */}
           {hotspot.carouselMedia && hotspot.carouselMedia.length > 0 ? (
+            // 轮播媒体容器
             <div className="relative w-full h-full flex items-center justify-center bg-[#050505] group">
-              {/* 轮播媒体 */}
+              {/* 轮播视频元素 */}
               <video 
                 key={hotspot.carouselMedia[carouselIndex]}
                 src={hotspot.carouselMedia[carouselIndex]}
+                // 沉浸模式：视频放大；解读模式：视频还原
                 className={`max-w-full max-h-full transition-transform duration-[2000ms] ${activeMode === 'immersive' ? 'scale-110' : 'scale-100'}`}
                 autoPlay loop muted playsInline
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedData={handleVideoLoaded}
               />
               
-              {/* 轮播控件 */}
+              {/* 轮播指示器 - 底部圆点 */}
               <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                 {hotspot.carouselMedia.map((_, idx) => (
                   <button
@@ -210,6 +298,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
                 ))}
               </div>
               
+              {/* 上一张按钮 */}
               <button 
                 onClick={(e) => {
                    e.stopPropagation();
@@ -220,6 +309,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 19l-7-7 7-7" /></svg>
               </button>
               
+              {/* 下一张按钮 */}
               <button 
                 onClick={(e) => {
                    e.stopPropagation();
@@ -231,17 +321,31 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
               </button>
             </div>
           ) : (
+            // 单视频容器
             <div className="relative w-full h-full flex items-center justify-center bg-[#050505]">
+              {/* 主视频元素 - 绑定时序监听钩子 */}
               <video 
                 ref={videoRef}
                 src={activeVersion.url} 
+                // 沉浸模式：视频放大(scale-110)；解读模式：视频还原(scale-100)
                 className={`max-w-full max-h-full transition-transform duration-[2000ms] ${activeMode === 'immersive' ? 'scale-110' : 'scale-100'}`}
                 autoPlay loop muted playsInline
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedData={handleVideoLoaded}
               />
               
-              {/* 语义注释 */}
+              {/* 语义注释框 - 时序监听实现的关键帧标注
+               * 
+               * 显示条件：
+               * 1. 必须是解读模式 (activeMode === 'interpret')
+               * 2. 当前视频播放时间必须落在关键帧时间点的 ±1.5秒范围内
+               * 
+               * 时序双维度传递：
+               * - 时间维度：通过 currentTime 与 ann.time 的差值判断是否显示
+               * - 空间维度：通过 ann.position.x/y 确定标注框在画面中的位置
+               * 
+               * 动画效果：zoom-in + slide-in-from-bottom-2 实现浮现效果
+               */}
               {activeMode === 'interpret' && hotspot.annotations?.map((ann, idx) => (
                 Math.abs(currentTime - ann.time) < 1.5 && (
                   <div 
@@ -259,10 +363,17 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
           )}
         </div>
 
-        {/* 侧边信息栏 */}
+        {/* 侧边信息栏 - 解读模式下面板由边缘滑入
+         * 
+         * 动画实现：
+         * - 沉浸模式：translate-x-full + opacity-0，隐藏到右侧边缘外
+         * - 解读模式：translate-x-0 + opacity-100，从右侧滑入
+         * - transition-all duration-700：700ms 的平滑过渡动画
+         */}
         <div className={`flex-1 flex flex-col border-l border-white/5 overflow-hidden bg-[#080808] transition-all duration-700 ${activeMode === 'immersive' ? 'translate-x-full opacity-0 w-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}>
           <div className="p-8 pt-20 h-full overflow-y-auto no-scrollbar space-y-12">
             
+            {/* 篇章信息 section */}
             <section>
               <h2 className="text-4xl font-serif text-[#f0e6d2] leading-tight mb-2">{getChapterContent(hotspot).label}</h2>
               {getChapterContent(hotspot).subtitle && (
@@ -287,6 +398,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
               )}
             </section>
 
+            {/* AI 语义视点 section - Gemini API 生成的场景解读 */}
             {loading ? (
               <section className="space-y-4 animate-pulse opacity-50">
                 <div className="h-4 w-24 bg-[#c5a059]/10 rounded mb-4" />
@@ -321,6 +433,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
               </section>
             )}
 
+            {/* 风格变体 section - 同一视频的多种AI生成风格 */}
             {hotspot.versions && (
               <section className="space-y-4">
                 <h3 className="text-[9px] text-white/20 tracking-[0.3em] uppercase">风格变体</h3>
@@ -341,6 +454,7 @@ const VideoPortal: React.FC<VideoPortalProps> = ({ hotspot, onClose, onJumpTo, a
               </section>
             )}
 
+            {/* 延展探索 section - 相关热点跳转 */}
             {relatedHotspots.length > 0 && (
               <section className="space-y-4 pt-4 border-t border-white/5">
                 <h3 className="text-[9px] text-white/20 tracking-[0.3em] uppercase">延展探索</h3>
