@@ -19,31 +19,35 @@
         .chinese-font {
             font-family: 'Zhi+Mang+Xing', cursive;
         }
-        /* 宣纸纹理叠层 */
+        /* 1. 宣纸纹理叠层：物理质感模拟 */
         .xuan-paper-overlay {
-            position: fixed;
+            position: fixed; /* 固定定位，覆盖全屏 */
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
-            z-index: 999;
-            opacity: 0.12;
-            background-image: url('https://www.transparenttextures.com/patterns/natural-paper.png');
-            mix-blend-mode: overlay;
+            pointer-events: none; /* 穿透交互：确保纹理层不阻挡用户点击底层元素 */
+            z-index: 999; /* 置于顶层，确保纹理覆盖所有内容 */
+            opacity: 0.12; /* 细微透明度，避免纹理过重影响阅读 */
+            background-image: url('https://www.transparenttextures.com/patterns/natural-paper.png'); /* 真实纸张纹理图 */
+            mix-blend-mode: overlay; /* 核心算法：叠加混合模式，将纹理亮度信息与底色融合 */
         }
         .glass-panel {
             background: rgba(15, 15, 15, 0.85);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(197, 160, 89, 0.2);
         }
+        /* 2. 水墨发光：古铜金呼吸光效 */
         .ink-glow {
+            /* 使用 drop-shadow 滤镜而非 box-shadow，以贴合不规则图形（如Logo文字）边缘产生投影 */
             filter: drop-shadow(0 0 15px rgba(197, 160, 89, 0.5));
-            animation: pulse-glow 3s ease-in-out infinite;
+            animation: pulse-glow 3s ease-in-out infinite; /* 3秒周期的呼吸循环动画 */
         }
 
         @keyframes pulse-glow {
+            /* 0% 和 100%：光晕收缩变淡 */
             0%, 100% { filter: drop-shadow(0 0 15px rgba(197, 160, 89, 0.3)); }
+            /* 50%：光晕扩散变强，模拟呼吸感 */
             50% { filter: drop-shadow(0 0 25px rgba(197, 160, 89, 0.8)); }
         }
         .red-seal {
@@ -62,14 +66,17 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
-        /* 水墨脉冲动效 */
+        /* 3. 水墨脉冲：交互热点扩散动效 */
         @keyframes ink-pulse {
+            /* 初始状态：略小，不可见 */
             0% { transform: scale(0.8); opacity: 0; }
+            /* 中间状态：显现，模拟墨滴入水 */
             50% { opacity: 0.3; }
+            /* 结束状态：扩散至2倍大小并消散，模拟墨迹晕开 */
             100% { transform: scale(2); opacity: 0; }
         }
         .ink-pulse {
-            animation: ink-pulse 2s ease-out infinite;
+            animation: ink-pulse 2s ease-out infinite; /* 2秒周期的向外扩散动画 */
         }
         @keyframes hotspot-blink {
             0%, 100% { opacity: 0.35; }

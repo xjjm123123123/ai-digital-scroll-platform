@@ -213,20 +213,20 @@ const App: React.FC = () => {
     <Layout currentView={state.currentView} onNavigate={handleNavigate}>
       {state.currentView === 'home' && (
         <div className="w-full h-full flex flex-col items-center justify-center bg-black overflow-hidden relative">
-          {/* 背景装饰 - LiquidEther */}
+          {/* 背景装饰 - LiquidEther 流体仿真层 */}
           <div className="absolute inset-0 z-0 opacity-40">
             <LiquidEther
-              mouseForce={20}
-              cursorSize={140}
-              isViscous={false}
-              viscous={65}
-              colors={["#c2c1c8", "#eeefe6", "#ffffff"]}
-              autoDemo
-              autoSpeed={0.5}
-              autoIntensity={3.7}
-              isBounce={false}
-              resolution={0.75}
-              backgroundImage="/images/tiles/tile_0.jpg"
+              mouseForce={20}       // 鼠标交互力度：控制鼠标划过时产生波纹的推力大小
+              cursorSize={140}      // 光标影响范围：模拟毛笔笔触的晕染半径
+              isViscous={false}     // 流体粘滞开关：关闭以获得清澈如水的流动感
+              viscous={65}          // 粘滞系数：控制流体扩散后的阻尼衰减速度
+              colors={["#c2c1c8", "#eeefe6", "#ffffff"]} // 水墨色调：灰白与淡墨色的渐变融合
+              autoDemo              // 启用自动演示：无人交互时流体自动缓慢流动
+              autoSpeed={0.5}       // 自动流速：保持静谧的背景动态
+              autoIntensity={3.7}   // 自动扰动强度：模拟微风拂过水面的自然波纹
+              isBounce={false}      // 边界回弹：关闭以模拟无边际的开阔水域
+              resolution={0.75}     // 渲染分辨率：平衡画质与性能，确保低配设备流畅
+              backgroundImage="/images/tiles/tile_0.jpg" // 底层纹理：将流体效果叠加于古画局部
               style={{ width: '100%', height: '100%' }}
             />
           </div>

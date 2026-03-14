@@ -119,8 +119,20 @@ export function searchKnowledge(query: string, topK: number = 5): KnowledgeEntry
 
 /**
  * 构建上下文字符串
- * @param entries 知识库条目
- * @returns 格式化的上下文文本
+ * 
+ * 将检索到的知识条目格式化为 LLM 可理解的文本块。
+ * 
+ * 【设计考量 - 充实的文化背景】
+ * 为了让主模型（Gemini）在生成回答时能更好地理解《豳风图》的深层文化内涵，
+ * 我们不仅提供了标题和正文，还显式注入了元数据（分类与标签）。
+ * 
+ * - 分类（Category）：如“画卷赏析”、“农事文化”，为模型划定知识领域。
+ * - 标签（Tags）：如“宋代”、“名画”、“风俗”，为模型提供关联的文化属性。
+ * 
+ * 这种结构化的上下文输入，有助于模型生成更具历史底蕴和专业深度的回答。
+ * 
+ * @param entries 检索到的高分知识库条目
+ * @returns 格式化的上下文文本，供 Prompt 使用
  */
 export function buildContext(entries: KnowledgeEntry[]): string {
     if (entries.length === 0) {
@@ -128,7 +140,20 @@ export function buildContext(entries: KnowledgeEntry[]): string {
     }
 
     return entries
-        .map(entry => `【${entry.title}】\n${entry.content}`)
+        .map(entry => {
+            let contextStr = `【${entry.title}】`;
+            
+            // 注入元数据：分类 (Category) - 提供宏观知识领域上下文
+            if (entry.category) contextStr += `\n分类：${entry.category}`;
+            
+            // 注入元数据：标签 (Tags) - 提供微观文化属性关联
+            if (entry.tags && entry.tags.length > 0) contextStr += `\n标签：${entry.tags.join(', ')}`;
+            
+            // 核心内容
+            contextStr += `\n内容：${entry.content}`;
+            
+            return contextStr;
+        })
         .join('\n\n');
 }
 
