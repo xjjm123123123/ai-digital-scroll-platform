@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Layout from './components/Layout';
 import ScrollScene from './components/ScrollScene';
 import MiniMap from './components/MiniMap';
@@ -9,8 +9,10 @@ import BackgroundView from './components/BackgroundView';
 import LiquidEther from './components/LiquidEther';
 import RagChat from './components/RagChat';
 import BGMPlayer from './components/BGMPlayer';
-import { AppState, Hotspot } from './types';
+import ReadingReport from './components/ReadingReport';
+import { AppState, Hotspot, ReadingReport as ReadingReportModel, ReadingSession } from './types';
 import { SCROLL_WIDTH } from './constants';
+import { buildReadingReport, createReadingSession, recordChatQuestion, recordHotspotClick, recordVideoClose, recordVideoOpen, recordViewSample } from './src/lib/readingReport';
 
 const HOTSPOT_LABEL_MAP: Record<string, string> = {
   '场景一': '狼跋',
@@ -47,8 +49,47 @@ const App: React.FC = () => {
   const [radarActive, setRadarActive] = useState(false);
   const [history, setHistory] = useState<Hotspot[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportModel, setReportModel] = useState<ReadingReportModel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
+
+  const readingSessionRef = useRef<ReadingSession | null>(null);
+  const previousViewRef = useRef<AppState['currentView']>('home');
+  const selectedHotspotRef = useRef<Hotspot | null>(null);
+  const videoOpenRef = useRef<{ hotspot: Hotspot; openedAt: number } | null>(null);
+
+  useEffect(() => {
+    selectedHotspotRef.current = state.selectedHotspot;
+  }, [state.selectedHotspot]);
+
+  const ensureSession = () => {
+    if (!readingSessionRef.current) readingSessionRef.current = createReadingSession();
+    return readingSessionRef.current;
+  };
+
+  useEffect(() => {
+    const prev = previousViewRef.current;
+    if (prev !== state.currentView) {
+      previousViewRef.current = state.currentView;
+    }
+
+    if (state.currentView === 'explore' && prev !== 'explore') {
+      readingSessionRef.current = createReadingSession();
+      videoOpenRef.current = null;
+      setHistory([]);
+      setShowHistory(false);
+      setShowReport(false);
+      setReportModel(null);
+    }
+
+    if (prev === 'explore' && state.currentView !== 'explore') {
+      readingSessionRef.current = null;
+      videoOpenRef.current = null;
+      setShowReport(false);
+      setReportModel(null);
+    }
+  }, [state.currentView]);
 
   // 最小加载时间（毫秒）- 优化体验，保留 2秒 动画展示
   const MIN_LOAD_TIME = 2000;
@@ -105,24 +146,36 @@ const App: React.FC = () => {
     return () => clearInterval(progressInterval);
   }, []);
 
-  // 快捷键支持
+  const closeVideoPortal = useCallback(() => {
+    const session = readingSessionRef.current;
+    const open = videoOpenRef.current;
+    const current = selectedHotspotRef.current;
+
+    if (session && open && current && open.hotspot.id === current.id) {
+      recordVideoClose(session, current, open.openedAt, Date.now());
+    }
+    videoOpenRef.current = null;
+    setState(prev => ({ ...prev, selectedHotspot: null }));
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (state.currentView !== 'explore') return;
 
       switch (e.key.toLowerCase()) {
         case 'q':
-          if (state.selectedHotspot) setState(prev => ({ ...prev, selectedHotspot: null }));
+          if (selectedHotspotRef.current) closeVideoPortal();
           break;
-        case 'r': // Radar
+        case 'r':
           setRadarActive(true);
           setTimeout(() => setRadarActive(false), 2000);
           break;
-        case 'c': // Cycle Mode
+        case 'c': {
           const modes: any[] = ['immersive', 'interpret'];
           const next = modes[(modes.indexOf(state.activeMode) + 1) % modes.length];
           setState(prev => ({ ...prev, activeMode: next }));
           break;
+        }
         case 'f':
           setJumpRequest({ x: state.position.x, y: state.position.y, scale: 1.0 });
           break;
@@ -133,7 +186,7 @@ const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.currentView, state.selectedHotspot, state.activeMode, state.position]);
+  }, [state.currentView, state.activeMode, state.position, closeVideoPortal]);
 
   const handleNavigate = useCallback((view: AppState['currentView']) => {
     setState(prev => ({ ...prev, currentView: view, selectedHotspot: null }));
@@ -144,18 +197,41 @@ const App: React.FC = () => {
   }, [handleNavigate]);
 
   const handleHotspotClick = useCallback((h: Hotspot) => {
+    if (state.currentView === 'explore') {
+      const session = ensureSession();
+      recordHotspotClick(session, h, Date.now());
+
+      const open = videoOpenRef.current;
+      const current = selectedHotspotRef.current;
+      if (open && current) {
+        recordVideoClose(session, current, open.openedAt, Date.now());
+      }
+
+      recordVideoOpen(session, h, Date.now());
+      videoOpenRef.current = { hotspot: h, openedAt: Date.now() };
+    }
     setState(prev => ({ ...prev, selectedHotspot: h }));
     setHistory(prev => {
       const filtered = prev.filter(item => item.id !== h.id);
       return [h, ...filtered].slice(0, 10);
     });
-  }, []);
+  }, [state.currentView]);
 
   const handleJump = useCallback((targetX: number) => {
     setJumpRequest({ x: targetX, y: 0, scale: 1 });
   }, []);
 
   const handleDeepJump = useCallback((target: Hotspot) => {
+    if (state.currentView === 'explore') {
+      const session = readingSessionRef.current;
+      const open = videoOpenRef.current;
+      const current = selectedHotspotRef.current;
+      if (session && open && current) {
+        recordVideoClose(session, current, open.openedAt, Date.now());
+      }
+      videoOpenRef.current = null;
+    }
+
     setState(prev => ({ ...prev, selectedHotspot: null }));
     const targetX = -(target.x / 100) * SCROLL_WIDTH + window.innerWidth / 2;
     setJumpRequest({ x: targetX, y: 0, scale: 1.5 });
@@ -163,11 +239,15 @@ const App: React.FC = () => {
     setTimeout(() => {
       handleHotspotClick(target);
     }, 1300);
-  }, [handleHotspotClick]);
+  }, [handleHotspotClick, state.currentView]);
 
   const handleViewChange = useCallback((pos: { x: number; y: number; scale: number }) => {
+    if (state.currentView === 'explore') {
+      const session = ensureSession();
+      recordViewSample(session, pos, Date.now(), 800);
+    }
     setState(prev => ({ ...prev, position: { x: pos.x, y: pos.y }, scale: pos.scale }));
-  }, []);
+  }, [state.currentView]);
 
   const handleRadarClick = useCallback(() => {
     setRadarActive(true);
@@ -182,8 +262,16 @@ const App: React.FC = () => {
   }, [handleDeepJump]);
 
   const handleVideoPortalClose = useCallback(() => {
-    setState(prev => ({ ...prev, selectedHotspot: null }));
-  }, []);
+    closeVideoPortal();
+  }, [closeVideoPortal]);
+
+  const handleReportClick = useCallback(() => {
+    if (state.currentView !== 'explore') return;
+    const session = ensureSession();
+    const report = buildReadingReport(session, history, { x: state.position.x, y: state.position.y, scale: state.scale });
+    setReportModel(report);
+    setShowReport(true);
+  }, [history, state.currentView, state.position.x, state.position.y, state.scale]);
 
   const handleVideoModeChange = useCallback((m: AppState['activeMode']) => {
     setState(prev => ({ ...prev, activeMode: m }));
@@ -326,6 +414,15 @@ const App: React.FC = () => {
                   </div>
                   <span className="text-[10px] tracking-wide">足迹(P)</span>
                 </button>
+                <button
+                  onClick={handleReportClick}
+                  className={`flex flex-col items-center gap-2 transition-all ${showReport ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
+                >
+                  <div className="w-7 h-7 border border-current rounded-sm flex items-center justify-center">
+                    <div className="w-3 h-[2px] bg-current" />
+                  </div>
+                  <span className="text-[10px] tracking-wide">报告</span>
+                </button>
               </div>
             </div>
 
@@ -346,6 +443,13 @@ const App: React.FC = () => {
               </div>
             )}
           </div>
+
+          {showReport && reportModel && (
+            <ReadingReport
+              report={reportModel}
+              onClose={() => setShowReport(false)}
+            />
+          )}
         </>
       )}
 
@@ -363,7 +467,13 @@ const App: React.FC = () => {
       )}
 
       {/* RAG 智能助手 */}
-      <RagChat />
+      <RagChat
+        onUserQuestion={(text, timestamp) => {
+          if (state.currentView !== 'explore') return;
+          const session = ensureSession();
+          recordChatQuestion(session, text, timestamp);
+        }}
+      />
 
       {/* 背景音乐播放器 */}
       <BGMPlayer />

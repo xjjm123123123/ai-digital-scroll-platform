@@ -73,3 +73,68 @@ export interface KnowledgeEntry {
   category: string;
   tags?: string[];
 }
+
+export interface ReadingHotspotClick {
+  hotspotId: string;
+  label: string;
+  subtitle?: string;
+  category?: string;
+  timestamp: number;
+}
+
+export interface ReadingViewSample {
+  x: number;
+  y: number;
+  scale: number;
+  timestamp: number;
+}
+
+export interface ReadingVideoOpen {
+  hotspotId: string;
+  label: string;
+  timestamp: number;
+}
+
+export interface ReadingVideoSession {
+  hotspotId: string;
+  label: string;
+  openedAt: number;
+  closedAt: number;
+  durationMs: number;
+}
+
+export interface ReadingChatQuestion {
+  text: string;
+  timestamp: number;
+}
+
+export interface ReadingSession {
+  sessionId: string;
+  startedAt: number;
+  endedAt?: number;
+  hotspotClicks: ReadingHotspotClick[];
+  viewSamples: ReadingViewSample[];
+  videoOpens: ReadingVideoOpen[];
+  videoSessions: ReadingVideoSession[];
+  chatQuestions: ReadingChatQuestion[];
+}
+
+export interface ReadingReport {
+  sessionId: string;
+  startedAt: number;
+  endedAt: number;
+  durationMs: number;
+  overview: {
+    hotspotsClicked: number;
+    uniqueHotspotsClicked: number;
+    chaptersVisited: number;
+    viewportDistancePx: number;
+    videosOpened: number;
+    videoTotalDurationMs: number;
+    questionsAsked: number;
+  };
+  categoryStats: Array<{ category: string; count: number; ratio: number }>;
+  recentHotspots: Array<{ hotspotId: string; label: string; subtitle?: string; category?: string; timestamp: number }>;
+  highlights: string[];
+  suggestions: string[];
+}

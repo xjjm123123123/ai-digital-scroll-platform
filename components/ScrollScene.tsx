@@ -285,6 +285,22 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
     return true;
   };
 
+  const visibleHotspots = hotspots.filter(h => isHotspotVisible(h.level));
+  const sortedHotspots = [...visibleHotspots].sort((a, b) => a.x - b.x);
+
+  const buildHotspotLinkPath = (from: Hotspot, to: Hotspot) => {
+    const x1 = (from.x / 100) * ORIGINAL_WIDTH + from.width / 2;
+    const y1 = (from.y / 100) * ORIGINAL_HEIGHT + from.height / 2;
+    const x2 = (to.x / 100) * ORIGINAL_WIDTH + to.width / 2;
+    const y2 = (to.y / 100) * ORIGINAL_HEIGHT + to.height / 2;
+
+    const dx = x2 - x1;
+    const cp1x = x1 + dx * 0.35;
+    const cp2x = x1 + dx * 0.65;
+
+    return `M ${x1} ${y1} C ${cp1x} ${y1}, ${cp2x} ${y2}, ${x2} ${y2}`;
+  };
+
   return (
     <div 
       ref={containerRef} 
@@ -351,8 +367,88 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
 
       {/* SVG 层 - 始终渲染以保持交互功能 */}
       <svg ref={svgRef} className={`w-full h-full absolute top-0 left-0 ${!isImageLoaded ? 'opacity-0' : ''}`} shapeRendering="optimizeSpeed">
+        <defs>
+          <linearGradient id="hotspotLinkGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#c5a059" stopOpacity="0.12" />
+            <stop offset="45%" stopColor="#f6d58e" stopOpacity="0.6" />
+            <stop offset="55%" stopColor="#c5a059" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#c5a059" stopOpacity="0.12" />
+          </linearGradient>
+          <filter id="hotspotLinkGlow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="3.2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
         <g transform={`translate(0, ${(containerRef.current?.clientHeight || SCROLL_HEIGHT) * 0.1})`}>
-          {hotspots.filter(h => isHotspotVisible(h.level)).map((h) => {
+          {sortedHotspots.length >= 2 && (
+            <g style={{ mixBlendMode: 'screen' }} pointerEvents="none">
+              {sortedHotspots.slice(0, -1).map((from, i) => {
+                const to = sortedHotspots[i + 1];
+                const d = buildHotspotLinkPath(from, to);
+
+                const glowOpacityMin = radarActive ? 0.08 : 0.04;
+                const glowOpacityMax = radarActive ? 0.28 : 0.16;
+                const glowWidth = radarActive ? 7 : 5;
+
+                const coreWidth = radarActive ? 1.6 : 1.2;
+                const coreDash = radarActive ? '7 14' : '6 18';
+                const coreDur = radarActive ? 4.2 : 6.2;
+
+                return (
+                  <g key={`${from.id}-${to.id}`}>
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke="rgba(197, 160, 89, 0.18)"
+                      strokeWidth={glowWidth}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      filter="url(#hotspotLinkGlow)"
+                      opacity={glowOpacityMin}
+                    >
+                      <animate
+                        attributeName="opacity"
+                        values={`${glowOpacityMin};${glowOpacityMax};${glowOpacityMin}`}
+                        dur="4.8s"
+                        begin={`${i * 0.35}s`}
+                        repeatCount="indefinite"
+                      />
+                    </path>
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke="url(#hotspotLinkGradient)"
+                      strokeWidth={coreWidth}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeDasharray={coreDash}
+                      opacity={radarActive ? 0.85 : 0.55}
+                    >
+                      <animate
+                        attributeName="stroke-dashoffset"
+                        values="0;-120"
+                        dur={`${coreDur}s`}
+                        begin={`${i * 0.25}s`}
+                        repeatCount="indefinite"
+                      />
+                      <animate
+                        attributeName="opacity"
+                        values={radarActive ? '0.45;0.95;0.45' : '0.22;0.65;0.22'}
+                        dur="3.6s"
+                        begin={`${i * 0.2}s`}
+                        repeatCount="indefinite"
+                      />
+                    </path>
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
+          {visibleHotspots.map((h) => {
             const padding = 10;
             const rectWidth = h.width + padding * 2;
             const rectHeight = h.height + padding * 2;
@@ -415,8 +511,6 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
             );
           })}
         </g>
-        {/* <defs>
-        </defs> */}
       </svg>
     </div>
   );

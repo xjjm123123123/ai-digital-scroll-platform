@@ -4,7 +4,11 @@ import { Message } from '../types';
 import { generateResponse, isApiKeyConfigured } from '../services/geminiService';
 import { loadKnowledgeBase, searchKnowledge, buildContext } from '../services/ragService';
 
-const RagChat: React.FC = () => {
+interface RagChatProps {
+    onUserQuestion?: (text: string, timestamp: number) => void;
+}
+
+const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
@@ -53,6 +57,7 @@ const RagChat: React.FC = () => {
             timestamp: Date.now(),
         };
 
+        onUserQuestion?.(userMessage.content, userMessage.timestamp);
         setMessages(prev => [...prev, userMessage]);
         setInputValue('');
         setIsLoading(true);
