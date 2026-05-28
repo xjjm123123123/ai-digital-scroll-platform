@@ -54,6 +54,7 @@ const App: React.FC = () => {
   const [reportModel, setReportModel] = useState<ReadingReportModel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
 
   const readingSessionRef = useRef<ReadingSession | null>(null);
   const previousViewRef = useRef<AppState['currentView']>('home');
@@ -147,6 +148,33 @@ const App: React.FC = () => {
     return () => clearInterval(progressInterval);
   }, []);
 
+  const isEditableTarget = (target: EventTarget | null) => {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+  };
+
+  const toggleBrowserFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      /* 部分浏览器会拦截非用户手势触发的全屏 */
+    }
+  }, []);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsBrowserFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
   const closeVideoPortal = useCallback(() => {
     const session = readingSessionRef.current;
     const open = videoOpenRef.current;
@@ -161,6 +189,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+
+      if (e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        void toggleBrowserFullscreen();
+        return;
+      }
+
       if (state.currentView !== 'explore') return;
 
       switch (e.key.toLowerCase()) {
@@ -189,7 +225,7 @@ const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.currentView, state.activeMode, state.position, closeVideoPortal]);
+  }, [state.currentView, state.activeMode, state.position, closeVideoPortal, toggleBrowserFullscreen]);
 
   const handleNavigate = useCallback((view: AppState['currentView']) => {
     setState(prev => ({ ...prev, currentView: view, selectedHotspot: null }));
@@ -429,6 +465,15 @@ const App: React.FC = () => {
                     <div className="w-3 h-[2px] bg-current" />
                   </div>
                   <span className="text-[10px] tracking-wide">报告</span>
+                </button>
+                <button
+                  onClick={() => void toggleBrowserFullscreen()}
+                  className={`flex flex-col items-center gap-2 transition-all ${isBrowserFullscreen ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
+                >
+                  <div className="w-7 h-7 border border-current rounded-sm flex items-center justify-center text-[9px] font-bold">
+                    B
+                  </div>
+                  <span className="text-[10px] tracking-wide">全屏</span>
                 </button>
               </div>
             </div>
