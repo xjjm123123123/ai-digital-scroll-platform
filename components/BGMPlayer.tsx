@@ -65,8 +65,9 @@ const BGMPlayer: React.FC = () => {
       
       <button
         onClick={togglePlay}
-        className="fixed bottom-6 right-6 z-[200] w-10 h-10 flex items-center justify-center bg-black/60 backdrop-blur-md border border-white/10 rounded-full hover:bg-black/80 transition-all group"
+        className="fixed bottom-24 right-10 z-[200] w-10 h-10 flex items-center justify-center bg-black/60 backdrop-blur-md border border-white/10 rounded-full hover:bg-black/80 transition-all group"
         title={isPlaying ? '暂停音乐' : '播放音乐'}
+        aria-label={isPlaying ? '暂停背景音乐' : '播放背景音乐'}
       >
         {isPlaying ? (
           <div className="flex items-center gap-[2px]">

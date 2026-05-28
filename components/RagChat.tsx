@@ -196,26 +196,39 @@ const RagChat: React.FC<RagChatProps> = ({
 
     return (
         <>
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className={`fixed bottom-10 right-10 z-[110] w-16 h-16 rounded-full bg-gradient-to-br from-[#c5a059] to-[#8b7355] shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${
-                    isOpen ? 'rotate-90' : ''
-                }`}
-                aria-label="打开智能导览"
-            >
-                {isOpen ? (
-                    <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            {!isOpen && (
+                <button
+                    type="button"
+                    onClick={() => setIsOpen(true)}
+                    className="fixed right-0 top-1/2 -translate-y-1/2 z-[110] flex flex-col items-center gap-2 py-5 pl-2 pr-2.5 rounded-l-md glass-panel border border-r-0 border-[#c5a059]/25 shadow-2xl text-[#c5a059] hover:pr-3.5 hover:text-[#e8dcc4] transition-all duration-300 group"
+                    aria-label="展开智能导览"
+                >
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#c5a059] to-[#8b7355] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                    </div>
+                    <span
+                        className="text-[10px] tracking-[0.35em] text-[#c5a059]/80 group-hover:text-[#c5a059]"
+                        style={{ writingMode: 'vertical-rl' }}
+                    >
+                        智能导览
+                    </span>
+                    <svg className="w-3 h-3 text-white/30 -rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
-                ) : (
-                    <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                    </svg>
-                )}
-            </button>
+                </button>
+            )}
 
             {isOpen && (
-                <div className="fixed bottom-32 right-10 z-[110] w-96 h-[600px] glass-panel flex flex-col shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+                <>
+                    <button
+                        type="button"
+                        className="fixed inset-0 z-[100] bg-black/25 backdrop-blur-[1px]"
+                        aria-label="收起智能导览"
+                        onClick={() => setIsOpen(false)}
+                    />
+                    <div className="fixed right-0 top-20 bottom-20 z-[110] w-96 max-w-[min(24rem,calc(100vw-2rem))] glass-panel flex flex-col shadow-2xl border-l border-[#c5a059]/20 animate-in slide-in-from-right duration-300">
                     <div className="flex items-center justify-between p-4 border-b border-[#c5a059]/20">
                         <div className="flex items-center gap-3 min-w-0">
                             <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[#c5a059] to-[#8b7355] flex items-center justify-center">
@@ -235,11 +248,13 @@ const RagChat: React.FC<RagChatProps> = ({
                             </div>
                         </div>
                         <button
+                            type="button"
                             onClick={() => setIsOpen(false)}
-                            className="text-white/40 hover:text-white transition-colors shrink-0"
+                            className="text-white/40 hover:text-white transition-colors shrink-0 p-1"
+                            aria-label="收起面板"
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                         </button>
                     </div>
@@ -385,6 +400,7 @@ const RagChat: React.FC<RagChatProps> = ({
                         <p className="text-[#c5a059]/40 text-xs mt-2 text-center">解读模式 · I/C 切换沉浸</p>
                     </div>
                 </div>
+                </>
             )}
         </>
     );
