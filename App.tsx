@@ -1,0 +1,484 @@
+
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import Layout from './components/Layout';
+import ScrollScene from './components/ScrollScene';
+import MiniMap from './components/MiniMap';
+import VideoPortal from './components/VideoPortal';
+import MethodView from './components/MethodView';
+import BackgroundView from './components/BackgroundView';
+import LiquidEther from './components/LiquidEther';
+import RagChat from './components/RagChat';
+import BGMPlayer from './components/BGMPlayer';
+import ReadingReport from './components/ReadingReport';
+import { AppState, Hotspot, ReadingReport as ReadingReportModel, ReadingSession } from './types';
+import { SCROLL_WIDTH } from './constants';
+import { buildReadingReport, createReadingSession, recordChatQuestion, recordHotspotClick, recordVideoClose, recordVideoOpen, recordViewSample } from './src/lib/readingReport';
+
+const HOTSPOT_LABEL_MAP: Record<string, string> = {
+  '场景一': '狼跋',
+  '场景二': '九罭',
+  '场景三': '九罭',
+  '场景四': '伐柯',
+  '场景五': '破斧',
+  '场景六': '东山',
+  '场景七': '七月',
+  '场景八': '七月',
+};
+
+const getHotspotDisplayLabel = (hotspot: Hotspot): string => {
+  if (HOTSPOT_LABEL_MAP[hotspot.label]) {
+    return HOTSPOT_LABEL_MAP[hotspot.label];
+  }
+  if (hotspot.label.startsWith('场景')) {
+    return hotspot.label;
+  }
+  return hotspot.label;
+};
+
+const App: React.FC = () => {
+  const [state, setState] = useState<AppState>({
+    currentView: 'home',
+    selectedHotspot: null,
+    isPanning: false,
+    scale: 1,
+    position: { x: 0, y: 0 },
+    activeMode: 'interpret'
+  });
+
+  const [jumpRequest, setJumpRequest] = useState<{ x: number; y: number; scale: number } | undefined>();
+  const [radarActive, setRadarActive] = useState(false);
+  const [history, setHistory] = useState<Hotspot[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportModel, setReportModel] = useState<ReadingReportModel | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+
+  const readingSessionRef = useRef<ReadingSession | null>(null);
+  const previousViewRef = useRef<AppState['currentView']>('home');
+  const selectedHotspotRef = useRef<Hotspot | null>(null);
+  const videoOpenRef = useRef<{ hotspot: Hotspot; openedAt: number } | null>(null);
+
+  useEffect(() => {
+    selectedHotspotRef.current = state.selectedHotspot;
+  }, [state.selectedHotspot]);
+
+  const ensureSession = () => {
+    if (!readingSessionRef.current) readingSessionRef.current = createReadingSession();
+    return readingSessionRef.current;
+  };
+
+  useEffect(() => {
+    const prev = previousViewRef.current;
+    if (prev !== state.currentView) {
+      previousViewRef.current = state.currentView;
+    }
+
+    if (state.currentView === 'explore' && prev !== 'explore') {
+      readingSessionRef.current = createReadingSession();
+      videoOpenRef.current = null;
+      setHistory([]);
+      setShowHistory(false);
+      setShowReport(false);
+      setReportModel(null);
+    }
+
+    if (prev === 'explore' && state.currentView !== 'explore') {
+      readingSessionRef.current = null;
+      videoOpenRef.current = null;
+      setShowReport(false);
+      setReportModel(null);
+    }
+  }, [state.currentView]);
+
+  // 最小加载时间（毫秒）- 优化体验，保留 2秒 动画展示
+  const MIN_LOAD_TIME = 2000;
+
+  // 资源预加载
+  useEffect(() => {
+    const startTime = Date.now();
+    const imagesToLoad = [
+      '/images/tiles/tile_0.jpg', // 仅预加载第一张切片
+      '/images/logo/Simplification.svg'
+    ];
+
+    // 模拟进度条
+    const progressInterval = setInterval(() => {
+      const elapsedTime = Date.now() - startTime;
+      const progress = Math.min(99, Math.floor((elapsedTime / MIN_LOAD_TIME) * 100));
+      setLoadingProgress(progress);
+    }, 100);
+
+    const loadImages = async () => {
+      try {
+        const promises = imagesToLoad.map(src => {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = src;
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+        });
+        await Promise.all(promises);
+
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, MIN_LOAD_TIME - elapsedTime);
+
+        setTimeout(() => {
+          clearInterval(progressInterval);
+          setLoadingProgress(100);
+          setIsLoading(false);
+        }, remainingTime);
+
+      } catch (err) {
+        console.error('Failed to load images', err);
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, MIN_LOAD_TIME - elapsedTime);
+        setTimeout(() => {
+          clearInterval(progressInterval);
+          setLoadingProgress(100);
+          setIsLoading(false);
+        }, remainingTime);
+      }
+    };
+
+    loadImages();
+    return () => clearInterval(progressInterval);
+  }, []);
+
+  const closeVideoPortal = useCallback(() => {
+    const session = readingSessionRef.current;
+    const open = videoOpenRef.current;
+    const current = selectedHotspotRef.current;
+
+    if (session && open && current && open.hotspot.id === current.id) {
+      recordVideoClose(session, current, open.openedAt, Date.now());
+    }
+    videoOpenRef.current = null;
+    setState(prev => ({ ...prev, selectedHotspot: null }));
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (state.currentView !== 'explore') return;
+
+      switch (e.key.toLowerCase()) {
+        case 'q':
+          if (selectedHotspotRef.current) closeVideoPortal();
+          break;
+        case 'r':
+          setRadarActive(true);
+          setTimeout(() => setRadarActive(false), 2000);
+          break;
+        case 'c': {
+          const modes: any[] = ['immersive', 'interpret'];
+          const next = modes[(modes.indexOf(state.activeMode) + 1) % modes.length];
+          setState(prev => ({ ...prev, activeMode: next }));
+          break;
+        }
+        case 'f':
+          setJumpRequest({ x: state.position.x, y: state.position.y, scale: 1.0 });
+          break;
+        case 'p':
+          setShowHistory(prev => !prev);
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state.currentView, state.activeMode, state.position, closeVideoPortal]);
+
+  const handleNavigate = useCallback((view: AppState['currentView']) => {
+    setState(prev => ({ ...prev, currentView: view, selectedHotspot: null }));
+  }, []);
+
+  const handleExploreClick = useCallback(() => {
+    handleNavigate('explore');
+  }, [handleNavigate]);
+
+  const handleHotspotClick = useCallback((h: Hotspot) => {
+    if (state.currentView === 'explore') {
+      const session = ensureSession();
+      recordHotspotClick(session, h, Date.now());
+
+      const open = videoOpenRef.current;
+      const current = selectedHotspotRef.current;
+      if (open && current) {
+        recordVideoClose(session, current, open.openedAt, Date.now());
+      }
+
+      recordVideoOpen(session, h, Date.now());
+      videoOpenRef.current = { hotspot: h, openedAt: Date.now() };
+    }
+    setState(prev => ({ ...prev, selectedHotspot: h }));
+    setHistory(prev => {
+      const filtered = prev.filter(item => item.id !== h.id);
+      return [h, ...filtered].slice(0, 10);
+    });
+  }, [state.currentView]);
+
+  const handleJump = useCallback((targetX: number) => {
+    setJumpRequest({ x: targetX, y: 0, scale: 1 });
+  }, []);
+
+  const handleDeepJump = useCallback((target: Hotspot) => {
+    if (state.currentView === 'explore') {
+      const session = readingSessionRef.current;
+      const open = videoOpenRef.current;
+      const current = selectedHotspotRef.current;
+      if (session && open && current) {
+        recordVideoClose(session, current, open.openedAt, Date.now());
+      }
+      videoOpenRef.current = null;
+    }
+
+    setState(prev => ({ ...prev, selectedHotspot: null }));
+    const targetX = -(target.x / 100) * SCROLL_WIDTH + window.innerWidth / 2;
+    setJumpRequest({ x: targetX, y: 0, scale: 1.5 });
+
+    setTimeout(() => {
+      handleHotspotClick(target);
+    }, 1300);
+  }, [handleHotspotClick, state.currentView]);
+
+  const handleViewChange = useCallback((pos: { x: number; y: number; scale: number }) => {
+    if (state.currentView === 'explore') {
+      const session = ensureSession();
+      recordViewSample(session, pos, Date.now(), 800);
+    }
+    setState(prev => ({ ...prev, position: { x: pos.x, y: pos.y }, scale: pos.scale }));
+  }, [state.currentView]);
+
+  const handleRadarClick = useCallback(() => {
+    setRadarActive(true);
+  }, []);
+
+  const handleHistoryClick = useCallback(() => {
+    setShowHistory(prev => !prev);
+  }, []);
+
+  const handleHistoryItemClick = useCallback((hotspot: Hotspot) => {
+    handleDeepJump(hotspot);
+  }, [handleDeepJump]);
+
+  const handleVideoPortalClose = useCallback(() => {
+    closeVideoPortal();
+  }, [closeVideoPortal]);
+
+  const handleReportClick = useCallback(() => {
+    if (state.currentView !== 'explore') return;
+    const session = ensureSession();
+    const report = buildReadingReport(session, history, { x: state.position.x, y: state.position.y, scale: state.scale });
+    setReportModel(report);
+    setShowReport(true);
+  }, [history, state.currentView, state.position.x, state.position.y, state.scale]);
+
+  const handleVideoModeChange = useCallback((m: AppState['activeMode']) => {
+    setState(prev => ({ ...prev, activeMode: m }));
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-[#0c0c0c] flex flex-col items-center justify-center select-none">
+        <div className="relative">
+          <div className="w-40 h-40 flex items-center justify-center">
+            <img
+              src="/images/logo/Simplification.svg"
+              alt="Loading..."
+              className="w-full h-full object-contain opacity-90"
+            />
+          </div>
+        </div>
+        <div className="mt-12 text-[#c5a059] text-xl tracking-[0.8em] font-bold chinese-font opacity-80 animate-pulse ml-4 text-center">
+          <div>载入中</div>
+          <div className="text-sm text-[#c5a059]/60 mt-2 font-serif tracking-[0.2em]">{loadingProgress}%</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Layout currentView={state.currentView} onNavigate={handleNavigate}>
+      {state.currentView === 'home' && (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-black overflow-hidden relative">
+          {/* 背景装饰 - LiquidEther 流体仿真层 */}
+          <div className="absolute inset-0 z-0 opacity-40">
+            <LiquidEther
+              mouseForce={20}       // 鼠标交互力度：控制鼠标划过时产生波纹的推力大小
+              cursorSize={140}      // 光标影响范围：模拟毛笔笔触的晕染半径
+              isViscous={false}     // 流体粘滞开关：关闭以获得清澈如水的流动感
+              viscous={65}          // 粘滞系数：控制流体扩散后的阻尼衰减速度
+              colors={["#c2c1c8", "#eeefe6", "#ffffff"]} // 水墨色调：灰白与淡墨色的渐变融合
+              autoDemo              // 启用自动演示：无人交互时流体自动缓慢流动
+              autoSpeed={0.5}       // 自动流速：保持静谧的背景动态
+              autoIntensity={3.7}   // 自动扰动强度：模拟微风拂过水面的自然波纹
+              isBounce={false}      // 边界回弹：关闭以模拟无边际的开阔水域
+              resolution={0.75}     // 渲染分辨率：平衡画质与性能，确保低配设备流畅
+              backgroundImage="/images/tiles/tile_0.jpg" // 底层纹理：将流体效果叠加于古画局部
+              style={{ width: '100%', height: '100%' }}
+            />
+          </div>
+
+          <div className="relative z-10 text-center space-y-16 max-w-4xl px-8">
+            <div className="flex flex-col items-center gap-10">
+              <div className="relative">
+                <div className="w-32 h-32 flex items-center justify-center ink-glow">
+                  <img
+                    src="/images/logo/Simplification.svg"
+                    alt="Logo"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+
+                {/* 装饰光圈 */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border border-[#c5a059]/20 rounded-full animate-spin-slow" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 border border-[#c5a059]/30 rounded-full animate-reverse-spin" />
+              </div>
+
+              <h1 className="text-6xl md:text-8xl font-bold tracking-[0.5em] text-[#e8dcc4] chinese-font ml-8 drop-shadow-2xl">
+                豳风图
+              </h1>
+
+              <p className="text-xl md:text-2xl text-[#c5a059]/80 font-serif tracking-[0.3em] ml-2">
+                数字长卷交互平台
+              </p>
+            </div>
+
+            <p className="text-white/40 text-lg leading-loose tracking-[0.4em] font-serif italic max-w-2xl mx-auto border-y border-[#c5a059]/10 py-10">
+              "七月流火，九月授衣。" <br />
+              展开长卷，仿佛推开一扇通往西周的窗；<br />
+              没有金戈铁马的喧嚣，只有草木生长的呼吸。
+            </p>
+
+            <button
+              onClick={handleExploreClick}
+              className="group relative px-20 py-6 bg-transparent border border-[#c5a059]/40 text-[#c5a059] font-bold tracking-[0.8em] overflow-hidden transition-all duration-700 hover:text-black"
+            >
+              <div className="absolute inset-0 bg-[#c5a059] -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out" />
+              <span className="relative z-10 text-lg">入 卷 探 幽</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {state.currentView === 'explore' && (
+        <>
+          <ScrollScene
+            onHotspotClick={handleHotspotClick}
+            externalPos={jumpRequest}
+            onViewChange={handleViewChange}
+            radarActive={radarActive}
+          />
+          <MiniMap
+            x={state.position.x}
+            viewWidth={typeof window !== 'undefined' ? window.innerWidth : 1200}
+            onJump={handleJump}
+          />
+
+          {/* 控制面板 */}
+          <div className="fixed bottom-10 left-10 flex gap-4 pointer-events-auto">
+            <div className="glass-panel p-6 flex gap-12 items-center border-[#c5a059]/20 shadow-2xl">
+              <div className="flex flex-col min-w-[120px]">
+                <div className="text-[10px] text-white/30 tracking-widest uppercase mb-2">当前叙事段落</div>
+                <span className="text-2xl text-[#f0e6d2] font-serif tracking-widest">
+                  {(() => {
+                    const progress = Math.abs(state.position.x) / SCROLL_WIDTH;
+                    if (progress < 1/7) return '狼跋';
+                    if (progress < 2/7) return '九罭';
+                    if (progress < 3/7) return '伐柯';
+                    if (progress < 4/7) return '破斧';
+                    if (progress < 5/7) return '东山';
+                    if (progress < 6/7) return '鸱鸮';
+                    return '七月';
+                  })()}
+                </span>
+              </div>
+              <div className="h-12 w-[1px] bg-white/10" />
+              <div className="flex gap-8">
+                <button
+                  onClick={handleRadarClick}
+                  className={`flex flex-col items-center gap-2 transition-all ${radarActive ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
+                >
+                  <div className="w-7 h-7 border border-current rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-current rounded-full" />
+                  </div>
+                  <span className="text-[10px] tracking-wide">探测(R)</span>
+                </button>
+                <button
+                  onClick={handleHistoryClick}
+                  className={`flex flex-col items-center gap-2 transition-all ${showHistory ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
+                >
+                  <div className="w-7 h-7 border border-current rounded p-[4px] flex flex-col gap-[3px]">
+                    <div className="h-[2px] w-full bg-current" />
+                    <div className="h-[2px] w-2/3 bg-current" />
+                  </div>
+                  <span className="text-[10px] tracking-wide">足迹(P)</span>
+                </button>
+                <button
+                  onClick={handleReportClick}
+                  className={`flex flex-col items-center gap-2 transition-all ${showReport ? 'text-[#c5a059]' : 'text-white/40 hover:text-white'}`}
+                >
+                  <div className="w-7 h-7 border border-current rounded-sm flex items-center justify-center">
+                    <div className="w-3 h-[2px] bg-current" />
+                  </div>
+                  <span className="text-[10px] tracking-wide">报告</span>
+                </button>
+              </div>
+            </div>
+
+            {showHistory && (
+              <div className="glass-panel p-5 w-56 animate-in slide-in-from-bottom-4 duration-300">
+                <div className="text-[10px] text-[#c5a059] mb-4 tracking-widest border-b border-[#c5a059]/10 pb-2">最近浏览</div>
+                <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                  {history.length > 0 ? history.map(h => (
+                    <button
+                      key={h.id}
+                      onClick={() => handleHistoryItemClick(h)}
+                      className="w-full text-left text-[12px] text-white/60 hover:text-[#c5a059] transition-colors truncate font-serif"
+                    >
+                      · {getHotspotDisplayLabel(h)}{h.subtitle ? `：${h.subtitle}` : ''}
+                    </button>
+                  )) : <div className="text-[11px] text-white/20 italic">尚无足迹</div>}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {showReport && reportModel && (
+            <ReadingReport
+              report={reportModel}
+              onClose={() => setShowReport(false)}
+            />
+          )}
+        </>
+      )}
+
+      {state.currentView === 'intro' && <BackgroundView />}
+      {state.currentView === 'method' && <MethodView />}
+
+      {state.selectedHotspot && (
+        <VideoPortal
+          hotspot={state.selectedHotspot}
+          onClose={handleVideoPortalClose}
+          onJumpTo={handleDeepJump}
+          activeMode={state.activeMode}
+          onModeChange={handleVideoModeChange}
+        />
+      )}
+
+      {/* RAG 智能助手 */}
+      <RagChat
+        onUserQuestion={(text, timestamp) => {
+          if (state.currentView !== 'explore') return;
+          const session = ensureSession();
+          recordChatQuestion(session, text, timestamp);
+        }}
+      />
+
+      {/* 背景音乐播放器 */}
+      <BGMPlayer />
+    </Layout>
+  );
+};
+
+export default App;

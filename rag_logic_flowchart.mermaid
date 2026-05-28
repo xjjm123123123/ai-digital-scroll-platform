@@ -1,0 +1,68 @@
+graph TD
+    Start([开始: 用户发起提问 Query]) --> Init[初始化: 加载知识库 KnowledgeBase]
+    Init --> Check{知识库是否加载?}
+    Check -- No --> ReturnEmpty([返回空结果])
+    Check -- Yes --> Preprocess[预处理: Query 转小写/去空格]
+    Preprocess --> Iterate[遍历知识库条目 Entry]
+    
+    subgraph Scoring_System [评分权重计算模型]
+        direction TB
+        Iterate --> InitScore[初始化 Score = 0]
+        
+        %% Dimension 1: 核心锚点
+        InitScore --> Dim1{维度1: 标题绝对匹配<br/>(+10分)}
+        Dim1 -- "Query ↔ Title 双向包含" --> Score1[Score += 10]
+        Dim1 -- No --> Dim2
+        Score1 --> Dim2
+        
+        %% Dimension 2: 关键实体
+        Dim2{维度2: 关键词散布匹配<br/>(+5分/词)}
+        Dim2 -- "遍历 Keywords" --> KwLoop{Query 包含 Keyword?}
+        KwLoop -- Yes --> Score2[Score += 5]
+        KwLoop -- No --> NextKw
+        Score2 --> NextKw{还有 Keyword?}
+        NextKw -- Yes --> KwLoop
+        NextKw -- No --> Dim3
+        Dim2 -- 无 Keywords --> Dim3
+        
+        %% Dimension 3: 长尾兜底
+        Dim3{维度3: 模糊内容包含<br/>(+3分)}
+        Dim3 -- "Content 包含 Query" --> Score3[Score += 3]
+        Dim3 -- No --> Dim4
+        Score3 --> Dim4
+        
+        %% Dimension 4: 文化背景
+        Dim4{维度4: 全局分类/标签匹配<br/>(+2分)}
+        Dim4 -- "Category 包含 Query" --> Score4a[Score += 2]
+        Dim4 -- No --> TagCheck
+        Score4a --> TagCheck
+        TagCheck -- "遍历 Tags" --> TagLoop{Query 包含 Tag?}
+        TagLoop -- Yes --> Score4b[Score += 2]
+        TagLoop --> NextTag
+        Score4b --> NextTag{还有 Tag?}
+        NextTag -- Yes --> TagLoop
+        NextTag -- No --> FinishScore
+    end
+    
+    FinishScore[完成单条目评分] --> NextEntry{还有条目?}
+    NextEntry -- Yes --> Iterate
+    NextEntry -- No --> Filter[过滤: 剔除 Score = 0 的条目]
+    
+    Filter --> Sort[排序: 按 Score 降序排列]
+    Sort --> TopK[截断: 取 Top-K 条目]
+    
+    TopK --> ContextGen[上下文构建: buildContext]
+    
+    subgraph Context_Construction [结构化上下文生成]
+        ContextGen --> LoopTopK[遍历 Top-K 条目]
+        LoopTopK --> Extract[提取元数据: Title, Category, Tags]
+        Extract --> Inject[注入文化背景: <br/>Title + Category + Tags + Content]
+        Inject --> Combine[拼接生成最终 Context String]
+    end
+    
+    Combine --> End([结束: 输出给 LLM])
+    
+    style Start fill:#f9f,stroke:#333,stroke-width:2px
+    style End fill:#f9f,stroke:#333,stroke-width:2px
+    style Scoring_System fill:#e1f5fe,stroke:#01579b,stroke-width:2px,stroke-dasharray: 5 5
+    style Context_Construction fill:#fff3e0,stroke:#ff6f00,stroke-width:2px,stroke-dasharray: 5 5
