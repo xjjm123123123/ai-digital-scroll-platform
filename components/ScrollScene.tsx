@@ -17,16 +17,19 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   const svgRef = useRef<SVGSVGElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<any>(null);
-  const [currentScale, setCurrentScale] = useState(1);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [bgImageSize, setBgImageSize] = useState({ width: SCROLL_WIDTH, height: SCROLL_HEIGHT });
   const [displayScale, setDisplayScale] = useState(1);
-  const [isDragging, setIsDragging] = useState(false);
-  const [lastInteractionTime, setLastInteractionTime] = useState(0);
-  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+  const onViewChangeRef = useRef(onViewChange);
+  const lastViewReportRef = useRef(0);
+  const isDraggingRef = useRef(false);
   
   // 数据库热点数据
   const [hotspots, setHotspots] = useState<Hotspot[]>(HOTSPOTS);
+
+  useEffect(() => {
+    onViewChangeRef.current = onViewChange;
+  }, [onViewChange]);
 
   useEffect(() => {
     const loadHotspots = async () => {
@@ -94,43 +97,43 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
     const g = svg.select('g');
     
     // 初始化 zoom 行为
+    const applyPanTransform = (translateX: number) => {
+      const containerHeight = containerRef.current?.clientHeight || SCROLL_HEIGHT;
+      const targetHeight = containerHeight * 0.8;
+      const scale = targetHeight / ORIGINAL_HEIGHT;
+      const offsetY = (containerHeight - targetHeight) / 2;
+
+      g.attr('transform', `translate(${translateX}, ${offsetY}) scale(${scale})`);
+
+      if (bgRef.current) {
+        bgRef.current.style.transform = `translate3d(${translateX}px, ${offsetY}px, 0) scale(${scale})`;
+      }
+
+      return offsetY;
+    };
+
+    const reportViewChange = (x: number, offsetY: number, scaleK: number, immediate = false) => {
+      const now = performance.now();
+      if (!immediate && now - lastViewReportRef.current < 200) return;
+      lastViewReportRef.current = now;
+      onViewChangeRef.current({ x, y: offsetY, scale: scaleK });
+    };
+
     const zoom = d3.zoom()
       .scaleExtent([1, 1])
       .on('start', () => {
-        setIsDragging(true);
-        setLastInteractionTime(performance.now());
-        setIsAutoScrolling(false);
+        isDraggingRef.current = true;
       })
       .on('zoom', (event) => {
-        const { x, y, k } = event.transform;
-        
-        const containerHeight = containerRef.current?.clientHeight || SCROLL_HEIGHT;
-        // 统一逻辑：保持高度占用容器的 80%
-        const targetHeight = containerHeight * 0.8;
-        const scale = targetHeight / ORIGINAL_HEIGHT;
-        
-        // 垂直居中偏移
-        const offsetY = (containerHeight - targetHeight) / 2;
-        
-        g.attr('transform', `translate(${x}, ${offsetY}) scale(${scale})`);
-        
-        if (bgRef.current) {
-          bgRef.current.style.transform = `translate3d(${x}px, ${offsetY}px, 0) scale(${scale})`;
-        }
+        const { x, k } = event.transform;
+        const offsetY = applyPanTransform(x);
 
-        setCurrentScale(k);
-        setLastInteractionTime(performance.now());
-        setIsAutoScrolling(false);
-        
-        onViewChange({
-          x: x,
-          y: offsetY,
-          scale: k
-        });
+        if (event.sourceEvent) {
+          reportViewChange(x, offsetY, k, true);
+        }
       })
       .on('end', () => {
-        setIsDragging(false);
-        setLastInteractionTime(performance.now());
+        isDraggingRef.current = false;
       });
 
     zoomRef.current = zoom;
@@ -209,19 +212,13 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
     const renderedWidth = ORIGINAL_WIDTH * scale;
     const initialX = containerWidth - renderedWidth;
     
-    svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, 0).scale(1));
-
-    const handleMouseMove = () => {
-      setLastInteractionTime(performance.now());
-      setIsAutoScrolling(false);
-    };
-
-    containerRef.current.addEventListener('mousemove', handleMouseMove);
+    const initialTransform = d3.zoomIdentity.translate(initialX, 0).scale(1);
+    svg.call(zoom.transform, initialTransform);
+    reportViewChange(initialX, applyPanTransform(initialX), 1, true);
 
     return () => {
       svg.on('.zoom', null);
       if (containerRef.current) {
-        containerRef.current.removeEventListener('mousemove', handleMouseMove);
         resizeObserver.unobserve(containerRef.current);
         resizeObserver.disconnect();
       }
@@ -231,43 +228,57 @@ const ScrollScene: React.FC<ScrollSceneProps> = ({ onHotspotClick, externalPos, 
   useEffect(() => {
     let animationFrameId: number;
     let lastTime = performance.now();
-    
+
     const animate = (currentTime: number) => {
-      const deltaTime = currentTime - lastTime;
-      lastTime = currentTime;
-      
-      const shouldAutoScroll = !isDragging;
-      
-      if (shouldAutoScroll && zoomRef.current && svgRef.current) {
-        setIsAutoScrolling(true);
-        
-        const currentTransform = d3.zoomTransform(svgRef.current);
-        const scrollSpeed = 0.3;
-        const containerWidth = containerRef.current?.clientWidth || 0;
-        const contentWidth = ORIGINAL_WIDTH * displayScale;
-        const minX = containerWidth - contentWidth;
-        
-        let newX = currentTransform.x + scrollSpeed * (deltaTime / 16.67);
-        
-        if (newX > 0) {
-          newX = minX;
-        }
-        
-        d3.select(svgRef.current)
-          .call(zoomRef.current.transform, d3.zoomIdentity.translate(newX, currentTransform.y).scale(currentTransform.k));
-      }
-      
       animationFrameId = requestAnimationFrame(animate);
-    };
-    
-    animationFrameId = requestAnimationFrame(animate);
-    
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
+
+      if (document.hidden || isDraggingRef.current) return;
+
+      const deltaTime = Math.min(currentTime - lastTime, 50);
+      lastTime = currentTime;
+
+      if (!svgRef.current || !containerRef.current) return;
+
+      const svg = d3.select(svgRef.current);
+      const currentTransform = d3.zoomTransform(svgRef.current);
+      const scrollSpeed = 0.3;
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
+      const contentScale = (containerHeight * 0.8) / ORIGINAL_HEIGHT;
+      const contentWidth = ORIGINAL_WIDTH * contentScale;
+      const minX = containerWidth - contentWidth;
+
+      let newX = currentTransform.x + scrollSpeed * (deltaTime / 16.67);
+      if (newX > 0) {
+        newX = minX;
+      }
+
+      const containerH = containerRef.current.clientHeight;
+      const targetHeight = containerH * 0.8;
+      const renderScale = targetHeight / ORIGINAL_HEIGHT;
+      const offsetY = (containerH - targetHeight) / 2;
+
+      svg.select('g').attr('transform', `translate(${newX}, ${offsetY}) scale(${renderScale})`);
+      if (bgRef.current) {
+        bgRef.current.style.transform = `translate3d(${newX}px, ${offsetY}px, 0) scale(${renderScale})`;
+      }
+
+      const nextTransform = d3.zoomIdentity.translate(newX, currentTransform.y).scale(currentTransform.k);
+      svg.property('__zoom', nextTransform);
+
+      const now = performance.now();
+      if (now - lastViewReportRef.current >= 200) {
+        lastViewReportRef.current = now;
+        onViewChangeRef.current({ x: newX, y: offsetY, scale: currentTransform.k });
       }
     };
-  }, [isDragging, displayScale]);
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
 
   useEffect(() => {
     if (externalPos && zoomRef.current && svgRef.current) {

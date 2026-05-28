@@ -1,4 +1,5 @@
-import { KnowledgeEntry } from '../types';
+import { getChapterContent } from '../config/chapterContent';
+import { Hotspot, KnowledgeEntry, SearchKnowledgeOptions } from '../types';
 
 let knowledgeBase: KnowledgeEntry[] = [];
 let isLoaded = false;
@@ -46,13 +47,114 @@ export async function loadKnowledgeBase(): Promise<void> {
  *    - 目的：利用元数据标签将相近文化属性的知识条目聚类，提供充实的文化背景。
  *    - 机制：当查询涉及分类或标签时给予少量加分，辅助提升相关领域内容的排名。
  */
-export function searchKnowledge(query: string, topK: number = 5): KnowledgeEntry[] {
+const HOTSPOT_TITLE_BOOST = 8;
+const HOTSPOT_CHAPTER_BOOST = 6;
+const HOTSPOT_CATEGORY_BOOST = 4;
+const HOTSPOT_KEYWORD_BOOST = 3;
+const HOTSPOT_TAG_BOOST = 3;
+const SCROLL_CHAPTER_BOOST = 5;
+
+function collectHotspotTerms(hotspot?: Hotspot | null, scrollChapter?: string): string[] {
+    const terms = new Set<string>();
+    const add = (s?: string) => {
+        const t = s?.trim();
+        if (t && t.length > 0) terms.add(t.toLowerCase());
+    };
+
+    if (hotspot) {
+        add(hotspot.label);
+        add(hotspot.category);
+        add(hotspot.subtitle);
+        add(hotspot.description);
+        const chapter = getChapterContent(hotspot);
+        add(chapter.label);
+        add(chapter.subtitle);
+    }
+    if (scrollChapter) add(scrollChapter);
+
+    return [...terms];
+}
+
+function textMatchesAnyTerm(text: string, terms: string[]): boolean {
+    const lower = text.toLowerCase();
+    return terms.some((t) => t.length > 0 && (lower.includes(t) || t.includes(lower)));
+}
+
+function applyHotspotBoost(
+    score: number,
+    entry: KnowledgeEntry,
+    terms: string[],
+    hotspot?: Hotspot | null,
+    scrollChapter?: string
+): number {
+    if (terms.length === 0) return score;
+
+    let boost = 0;
+    const titleLower = entry.title.toLowerCase();
+    const contentLower = entry.content.toLowerCase();
+    const categoryLower = entry.category.toLowerCase();
+
+    if (hotspot) {
+        const chapter = getChapterContent(hotspot);
+        const labelLower = hotspot.label.toLowerCase();
+        const chapterLower = chapter.label.toLowerCase();
+
+        if (titleLower.includes(labelLower) || labelLower.includes(titleLower)) {
+            boost += HOTSPOT_TITLE_BOOST;
+        }
+        if (chapter.label && (titleLower.includes(chapterLower) || contentLower.includes(chapterLower))) {
+            boost += HOTSPOT_CHAPTER_BOOST;
+        }
+        if (hotspot.category && categoryLower.includes(hotspot.category.toLowerCase())) {
+            boost += HOTSPOT_CATEGORY_BOOST;
+        }
+        if (chapter.subtitle && contentLower.includes(chapter.subtitle.toLowerCase())) {
+            boost += HOTSPOT_KEYWORD_BOOST;
+        }
+    }
+
+    if (scrollChapter) {
+        const ch = scrollChapter.toLowerCase();
+        if (
+            titleLower.includes(ch) ||
+            contentLower.includes(ch) ||
+            (entry.tags?.some((tag) => tag.toLowerCase().includes(ch)) ?? false)
+        ) {
+            boost += SCROLL_CHAPTER_BOOST;
+        }
+    }
+
+    if (entry.keywords?.length) {
+        for (const keyword of entry.keywords) {
+            if (textMatchesAnyTerm(keyword, terms)) boost += HOTSPOT_KEYWORD_BOOST;
+        }
+    }
+    if (entry.tags?.length) {
+        for (const tag of entry.tags) {
+            if (textMatchesAnyTerm(tag, terms)) boost += HOTSPOT_TAG_BOOST;
+        }
+    }
+
+    return score + boost;
+}
+
+export function searchKnowledge(
+    query: string,
+    topKOrOptions: number | SearchKnowledgeOptions = 5
+): KnowledgeEntry[] {
+    const options: SearchKnowledgeOptions =
+        typeof topKOrOptions === 'number' ? { topK: topKOrOptions } : topKOrOptions;
+    const topK = options.topK ?? 5;
+    const { hotspot = null, scrollChapter } = options;
+
     if (!isLoaded || knowledgeBase.length === 0) {
         return [];
     }
 
     const queryLower = query.toLowerCase().trim();
     if (!queryLower) return [];
+
+    const hotspotTerms = collectHotspotTerms(hotspot, scrollChapter);
 
     // 计算每个条目的相关性分数
     const scored = knowledgeBase.map(entry => {
@@ -103,6 +205,8 @@ export function searchKnowledge(query: string, topK: number = 5): KnowledgeEntry
                 }
             });
         }
+
+        score = applyHotspotBoost(score, entry, hotspotTerms, hotspot, scrollChapter);
 
         return { entry, score };
     });

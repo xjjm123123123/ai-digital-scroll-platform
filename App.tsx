@@ -12,7 +12,8 @@ import BGMPlayer from './components/BGMPlayer';
 import ReadingReport from './components/ReadingReport';
 import { AppState, Hotspot, ReadingReport as ReadingReportModel, ReadingSession } from './types';
 import { SCROLL_WIDTH } from './constants';
-import { buildReadingReport, createReadingSession, recordChatQuestion, recordHotspotClick, recordVideoClose, recordVideoOpen, recordViewSample } from './src/lib/readingReport';
+import { buildReadingReport, chapterFromScrollX, createReadingSession, recordChatQuestion, recordHotspotClick, recordVideoClose, recordVideoOpen, recordViewSample } from './src/lib/readingReport';
+import { shouldShowExploreChrome, shouldShowRagChat } from './config/viewModes';
 
 const HOTSPOT_LABEL_MAP: Record<string, string> = {
   '场景一': '狼跋',
@@ -42,7 +43,7 @@ const App: React.FC = () => {
     isPanning: false,
     scale: 1,
     position: { x: 0, y: 0 },
-    activeMode: 'interpret'
+    activeMode: 'immersive'
   });
 
   const [jumpRequest, setJumpRequest] = useState<{ x: number; y: number; scale: number } | undefined>();
@@ -170,8 +171,10 @@ const App: React.FC = () => {
           setRadarActive(true);
           setTimeout(() => setRadarActive(false), 2000);
           break;
-        case 'c': {
-          const modes: any[] = ['immersive', 'interpret'];
+        case 'c':
+        case 'i': {
+          if (!selectedHotspotRef.current) break;
+          const modes: AppState['activeMode'][] = ['immersive', 'interpret'];
           const next = modes[(modes.indexOf(state.activeMode) + 1) % modes.length];
           setState(prev => ({ ...prev, activeMode: next }));
           break;
@@ -210,7 +213,7 @@ const App: React.FC = () => {
       recordVideoOpen(session, h, Date.now());
       videoOpenRef.current = { hotspot: h, openedAt: Date.now() };
     }
-    setState(prev => ({ ...prev, selectedHotspot: h }));
+    setState(prev => ({ ...prev, selectedHotspot: h, activeMode: 'interpret' }));
     setHistory(prev => {
       const filtered = prev.filter(item => item.id !== h.id);
       return [h, ...filtered].slice(0, 10);
@@ -289,7 +292,7 @@ const App: React.FC = () => {
             />
           </div>
         </div>
-        <div className="mt-12 text-[#c5a059] text-xl tracking-[0.8em] font-bold chinese-font opacity-80 animate-pulse ml-4 text-center">
+        <div className="mt-12 text-[#c5a059] text-xl tracking-[0.8em] font-normal chinese-font opacity-80 animate-pulse ml-4 text-center">
           <div>载入中</div>
           <div className="text-sm text-[#c5a059]/60 mt-2 font-serif tracking-[0.2em]">{loadingProgress}%</div>
         </div>
@@ -304,17 +307,19 @@ const App: React.FC = () => {
           {/* 背景装饰 - LiquidEther 流体仿真层 */}
           <div className="absolute inset-0 z-0 opacity-40">
             <LiquidEther
-              mouseForce={20}       // 鼠标交互力度：控制鼠标划过时产生波纹的推力大小
-              cursorSize={140}      // 光标影响范围：模拟毛笔笔触的晕染半径
-              isViscous={false}     // 流体粘滞开关：关闭以获得清澈如水的流动感
-              viscous={65}          // 粘滞系数：控制流体扩散后的阻尼衰减速度
-              colors={["#c2c1c8", "#eeefe6", "#ffffff"]} // 水墨色调：灰白与淡墨色的渐变融合
-              autoDemo              // 启用自动演示：无人交互时流体自动缓慢流动
-              autoSpeed={0.5}       // 自动流速：保持静谧的背景动态
-              autoIntensity={3.7}   // 自动扰动强度：模拟微风拂过水面的自然波纹
-              isBounce={false}      // 边界回弹：关闭以模拟无边际的开阔水域
-              resolution={0.75}     // 渲染分辨率：平衡画质与性能，确保低配设备流畅
-              backgroundImage="/images/tiles/tile_0.jpg" // 底层纹理：将流体效果叠加于古画局部
+              mouseForce={20}
+              cursorSize={120}
+              isViscous={false}
+              viscous={65}
+              iterationsPoisson={16}
+              iterationsViscous={16}
+              colors={["#c2c1c8", "#eeefe6", "#ffffff"]}
+              autoDemo
+              autoSpeed={0.5}
+              autoIntensity={2.4}
+              isBounce={false}
+              resolution={0.5}
+              backgroundImage="/images/tiles/tile_0.jpg"
               style={{ width: '100%', height: '100%' }}
             />
           </div>
@@ -335,7 +340,7 @@ const App: React.FC = () => {
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 border border-[#c5a059]/30 rounded-full animate-reverse-spin" />
               </div>
 
-              <h1 className="text-6xl md:text-8xl font-bold tracking-[0.5em] text-[#e8dcc4] chinese-font ml-8 drop-shadow-2xl">
+              <h1 className="text-6xl md:text-8xl font-normal tracking-[0.5em] text-[#e8dcc4] chinese-font ml-8 drop-shadow-2xl">
                 豳风图
               </h1>
 
@@ -369,13 +374,15 @@ const App: React.FC = () => {
             onViewChange={handleViewChange}
             radarActive={radarActive}
           />
-          <MiniMap
-            x={state.position.x}
-            viewWidth={typeof window !== 'undefined' ? window.innerWidth : 1200}
-            onJump={handleJump}
-          />
+          {shouldShowExploreChrome(!!state.selectedHotspot, state.activeMode) && (
+            <MiniMap
+              x={state.position.x}
+              viewWidth={typeof window !== 'undefined' ? window.innerWidth : 1200}
+              onJump={handleJump}
+            />
+          )}
 
-          {/* 控制面板 */}
+          {shouldShowExploreChrome(!!state.selectedHotspot, state.activeMode) && (
           <div className="fixed bottom-10 left-10 flex gap-4 pointer-events-auto">
             <div className="glass-panel p-6 flex gap-12 items-center border-[#c5a059]/20 shadow-2xl">
               <div className="flex flex-col min-w-[120px]">
@@ -443,6 +450,7 @@ const App: React.FC = () => {
               </div>
             )}
           </div>
+          )}
 
           {showReport && reportModel && (
             <ReadingReport
@@ -468,6 +476,10 @@ const App: React.FC = () => {
 
       {/* RAG 智能助手 */}
       <RagChat
+        visible={shouldShowRagChat(state.currentView, !!state.selectedHotspot, state.activeMode)}
+        hotspot={state.selectedHotspot}
+        scrollChapter={chapterFromScrollX(state.position.x)}
+        hotspotHistory={history}
         onUserQuestion={(text, timestamp) => {
           if (state.currentView !== 'explore') return;
           const session = ensureSession();

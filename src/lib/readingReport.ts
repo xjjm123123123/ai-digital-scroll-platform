@@ -3,7 +3,7 @@ import { Hotspot, ReadingReport, ReadingSession } from '../../types';
 
 const makeSessionId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
-const chapterLabelFromProgress = (progress: number) => {
+export const chapterLabelFromProgress = (progress: number) => {
   if (progress < 1 / 7) return '狼跋';
   if (progress < 2 / 7) return '九罭';
   if (progress < 3 / 7) return '伐柯';
@@ -11,6 +11,26 @@ const chapterLabelFromProgress = (progress: number) => {
   if (progress < 5 / 7) return '东山';
   if (progress < 6 / 7) return '鸱鸮';
   return '七月';
+};
+
+export const chapterFromScrollX = (scrollX: number): string => {
+  const progress = SCROLL_WIDTH > 0 ? Math.abs(scrollX) / SCROLL_WIDTH : 0;
+  return chapterLabelFromProgress(progress);
+};
+
+export const buildReadingContextString = (
+  scrollChapter: string,
+  recentHotspots: Hotspot[] = []
+): string => {
+  const parts: string[] = [`当前视口叙事段落：${scrollChapter}`];
+  if (recentHotspots.length > 0) {
+    const labels = recentHotspots
+      .slice(0, 5)
+      .map((h) => (h.subtitle ? `${h.label}（${h.subtitle}）` : h.label))
+      .join('、');
+    parts.push(`近期浏览热点：${labels}`);
+  }
+  return parts.join('\n');
 };
 
 export const createReadingSession = (): ReadingSession => ({

@@ -22,6 +22,8 @@ const SYSTEM_PROMPT = `你是豳风图数字长卷平台的智能导览助手。
 
 export interface ChatOptions {
     context?: string; // 从知识库检索到的相关上下文
+    hotspotContext?: string; // 当前画卷热点上下文
+    readingContext?: string; // 视口段落与浏览足迹
     temperature?: number; // 0-1，控制回答的创造性
 }
 
@@ -36,16 +38,25 @@ export async function generateResponse(
     options: ChatOptions = {}
 ): Promise<string> {
     try {
-        const { context = '', temperature = 0.7 } = options;
+        const { context = '', hotspotContext = '', readingContext = '', temperature = 0.7 } = options;
 
         // 构建消息列表
         const messages = [
             { role: 'system', content: SYSTEM_PROMPT }
         ];
 
-        let finalUserMessage = userMessage;
+        const contextBlocks: string[] = [];
+        const sceneParts = [hotspotContext, readingContext].filter(Boolean);
+        if (sceneParts.length > 0) {
+            contextBlocks.push(`【当前画卷浏览上下文】\n${sceneParts.join('\n\n')}`);
+        }
         if (context) {
-            finalUserMessage = `参考以下知识库内容回答问题：\n\n${context}\n\n---\n\n用户问题：${userMessage}`;
+            contextBlocks.push(`【知识库参考】\n${context}`);
+        }
+
+        let finalUserMessage = userMessage;
+        if (contextBlocks.length > 0) {
+            finalUserMessage = `${contextBlocks.join('\n\n')}\n\n---\n\n用户问题：${userMessage}`;
         }
         
         messages.push({ role: 'user', content: finalUserMessage });

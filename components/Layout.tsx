@@ -29,7 +29,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) =>
               className="w-full h-full object-contain" 
             />
           </div>
-          <h1 className="text-xl font-bold tracking-widest chinese-font">豳风数字交互平台</h1>
+          <h1 className="text-xl font-normal tracking-widest chinese-font">豳风数字交互平台</h1>
         </div>
 
         <div className="flex gap-8 pointer-events-auto">

@@ -74,6 +74,18 @@ export interface KnowledgeEntry {
   tags?: string[];
 }
 
+/** 画卷浏览足迹，供 RAG / 导览注入上下文 */
+export interface ReadingContext {
+  scrollChapter: string;
+  recentHotspots: Array<{ label: string; subtitle?: string; category?: string }>;
+}
+
+export interface SearchKnowledgeOptions {
+  topK?: number;
+  hotspot?: Hotspot | null;
+  scrollChapter?: string;
+}
+
 export interface ReadingHotspotClick {
   hotspotId: string;
   label: string;

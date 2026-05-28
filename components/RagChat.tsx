@@ -1,74 +1,167 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Message } from '../types';
+import { Message, Hotspot } from '../types';
 import { generateResponse, isApiKeyConfigured } from '../services/geminiService';
 import { loadKnowledgeBase, searchKnowledge, buildContext } from '../services/ragService';
+import { buildHotspotContext, getChapterContent } from '../config/chapterContent';
+import { getSuggestedQuestions, getGenericSuggestedQuestions } from '../config/suggestedQuestions';
+import { buildReadingContextString } from '../src/lib/readingReport';
 
 interface RagChatProps {
+    visible: boolean;
+    hotspot?: Hotspot | null;
+    scrollChapter?: string;
+    hotspotHistory?: Hotspot[];
     onUserQuestion?: (text: string, timestamp: number) => void;
 }
 
-const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
+const RagChat: React.FC<RagChatProps> = ({
+    visible,
+    hotspot,
+    scrollChapter = '',
+    hotspotHistory = [],
+    onUserQuestion,
+}) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isKnowledgeLoaded, setIsKnowledgeLoaded] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const lastHotspotIdRef = useRef<string | null>(null);
+    const hadUserMessagesRef = useRef(false);
 
-    // 加载知识库
+    const suggestedQuestions = useMemo(
+        () => (hotspot ? getSuggestedQuestions(hotspot) : getGenericSuggestedQuestions()),
+        [hotspot]
+    );
+
+    const chapterLabel = hotspot ? getChapterContent(hotspot).label : scrollChapter;
+
+    const readingContext = useMemo(
+        () => buildReadingContextString(scrollChapter, hotspotHistory),
+        [scrollChapter, hotspotHistory]
+    );
+
     useEffect(() => {
         loadKnowledgeBase().then(() => {
             setIsKnowledgeLoaded(true);
         });
     }, []);
 
-    // 自动滚动到底部
+    useEffect(() => {
+        if (!visible) {
+            setIsOpen(false);
+            lastHotspotIdRef.current = null;
+            hadUserMessagesRef.current = false;
+        }
+    }, [visible]);
+
+    const appendSceneMessage = useCallback((h: Hotspot, appendOnly: boolean) => {
+        const chapter = getChapterContent(h);
+        const sceneText = `您正在解读「${chapter.label}」${chapter.subtitle ? `（${chapter.subtitle}）` : ''}。可点击下方推荐问题，或直接提问。`;
+        const msg: Message = {
+            id: `scene-${h.id}-${Date.now()}`,
+            role: 'assistant',
+            content: sceneText,
+            timestamp: Date.now(),
+        };
+        if (appendOnly) {
+            setMessages((prev) => [...prev, msg]);
+        } else {
+            setMessages([msg]);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!visible || !isKnowledgeLoaded) return;
+
+        if (hotspot) {
+            const prevId = lastHotspotIdRef.current;
+            if (prevId === hotspot.id) return;
+
+            const appendOnly = prevId !== null && hadUserMessagesRef.current;
+            lastHotspotIdRef.current = hotspot.id;
+            appendSceneMessage(hotspot, appendOnly);
+            return;
+        }
+
+        if (lastHotspotIdRef.current !== null) {
+            lastHotspotIdRef.current = null;
+            setMessages((prev) => {
+                const switchMsg: Message = {
+                    id: `scene-clear-${Date.now()}`,
+                    role: 'assistant',
+                    content:
+                        '已离开热点解读。您可继续浏览长卷，或点击画面中的金色热点进入场景问答。',
+                    timestamp: Date.now(),
+                };
+                return prev.length > 0 && hadUserMessagesRef.current ? [...prev, switchMsg] : [
+                    {
+                        id: 'welcome',
+                        role: 'assistant',
+                        content:
+                            '您好！我是豳风图智能导览助手。浏览长卷时可随时提问；点击画面热点后将结合当前场景作答。',
+                        timestamp: Date.now(),
+                    },
+                ];
+            });
+            return;
+        }
+
+        if (messages.length === 0) {
+            setMessages([
+                {
+                    id: 'welcome',
+                    role: 'assistant',
+                    content:
+                        '您好！我是豳风图智能导览助手。浏览长卷时可随时提问；点击画面热点后将结合当前场景作答。',
+                    timestamp: Date.now(),
+                },
+            ]);
+        }
+    }, [visible, hotspot, isKnowledgeLoaded, appendSceneMessage, messages.length]);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // 初始欢迎消息
-    useEffect(() => {
-        if (messages.length === 0 && isKnowledgeLoaded) {
-            const welcomeMessage: Message = {
-                id: 'welcome',
-                role: 'assistant',
-                content: '您好！我是豳风图智能导览助手。您可以向我询问关于《豳风图》的历史背景、诗经解读、农事文化等问题。',
-                timestamp: Date.now(),
-            };
-            setMessages([welcomeMessage]);
-        }
-    }, [isKnowledgeLoaded]);
+    const handleSend = async (textOverride?: string) => {
+        const text = (textOverride ?? inputValue).trim();
+        if (!text || isLoading) return;
 
-    const handleSend = async () => {
-        if (!inputValue.trim() || isLoading) return;
-
-        // 检查 API Key
         if (!isApiKeyConfigured()) {
-            alert('请先在 .env.local 文件中配置 VITE_GEMINI_API_KEY');
+            alert('请先在 .env.local 文件中配置 VITE_DEEPSEEK_API_KEY');
             return;
         }
 
         const userMessage: Message = {
             id: `user-${Date.now()}`,
             role: 'user',
-            content: inputValue.trim(),
+            content: text,
             timestamp: Date.now(),
         };
 
+        hadUserMessagesRef.current = true;
         onUserQuestion?.(userMessage.content, userMessage.timestamp);
-        setMessages(prev => [...prev, userMessage]);
+        setMessages((prev) => [...prev, userMessage]);
         setInputValue('');
         setIsLoading(true);
 
         try {
-            // 从知识库检索相关内容
-            const relevantEntries = searchKnowledge(userMessage.content, 3);
+            const hotspotContext = hotspot ? buildHotspotContext(hotspot) : '';
+            const relevantEntries = searchKnowledge(userMessage.content, {
+                topK: 3,
+                hotspot: hotspot ?? null,
+                scrollChapter: scrollChapter || undefined,
+            });
             const context = buildContext(relevantEntries);
 
-            // 调用 Gemini API
-            const response = await generateResponse(userMessage.content, { context });
+            const response = await generateResponse(userMessage.content, {
+                context,
+                hotspotContext,
+                readingContext,
+            });
 
             const assistantMessage: Message = {
                 id: `assistant-${Date.now()}`,
@@ -77,7 +170,7 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                 timestamp: Date.now(),
             };
 
-            setMessages(prev => [...prev, assistantMessage]);
+            setMessages((prev) => [...prev, assistantMessage]);
         } catch (error) {
             console.error('发送消息失败:', error);
             const errorMessage: Message = {
@@ -86,7 +179,7 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                 content: '抱歉，发生了错误，请稍后再试。',
                 timestamp: Date.now(),
             };
-            setMessages(prev => [...prev, errorMessage]);
+            setMessages((prev) => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
         }
@@ -99,14 +192,16 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
         }
     };
 
+    if (!visible) return null;
+
     return (
         <>
-            {/* 浮动聊天按钮 */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`fixed bottom-10 right-10 z-50 w-16 h-16 rounded-full bg-gradient-to-br from-[#c5a059] to-[#8b7355] shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isOpen ? 'rotate-90' : ''
-                    }`}
-                aria-label="打开聊天助手"
+                className={`fixed bottom-10 right-10 z-[110] w-16 h-16 rounded-full bg-gradient-to-br from-[#c5a059] to-[#8b7355] shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${
+                    isOpen ? 'rotate-90' : ''
+                }`}
+                aria-label="打开智能导览"
             >
                 {isOpen ? (
                     <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -119,25 +214,29 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                 )}
             </button>
 
-            {/* 聊天对话框 */}
             {isOpen && (
-                <div className="fixed bottom-32 right-10 z-50 w-96 h-[600px] glass-panel flex flex-col shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
-                    {/* 头部 */}
+                <div className="fixed bottom-32 right-10 z-[110] w-96 h-[600px] glass-panel flex flex-col shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
                     <div className="flex items-center justify-between p-4 border-b border-[#c5a059]/20">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#c5a059] to-[#8b7355] flex items-center justify-center">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[#c5a059] to-[#8b7355] flex items-center justify-center">
                                 <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                                 </svg>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <h3 className="text-[#e8dcc4] font-bold text-sm tracking-wider">智能导览</h3>
-                                <p className="text-[#c5a059]/60 text-xs">豳风图助手</p>
+                                <p className="text-[#c5a059]/60 text-xs truncate">
+                                    {chapterLabel
+                                        ? hotspot
+                                            ? `当前：${chapterLabel}`
+                                            : `视口：${chapterLabel}`
+                                        : '豳风图助手'}
+                                </p>
                             </div>
                         </div>
                         <button
                             onClick={() => setIsOpen(false)}
-                            className="text-white/40 hover:text-white transition-colors"
+                            className="text-white/40 hover:text-white transition-colors shrink-0"
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -145,7 +244,25 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                         </button>
                     </div>
 
-                    {/* 消息列表 */}
+                    {suggestedQuestions.length > 0 && (
+                        <div
+                            key={hotspot?.id ?? `scroll-${scrollChapter}`}
+                            className="px-4 pt-3 pb-1 border-b border-white/5 flex flex-wrap gap-2"
+                        >
+                            {suggestedQuestions.map((q) => (
+                                <button
+                                    key={q}
+                                    type="button"
+                                    onClick={() => handleSend(q)}
+                                    disabled={isLoading}
+                                    className="text-left text-[10px] leading-snug px-2.5 py-1.5 rounded border border-[#c5a059]/25 text-[#c5a059]/90 bg-[#c5a059]/5 hover:bg-[#c5a059]/15 transition-colors disabled:opacity-40"
+                                >
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
                         {messages.map((msg) => (
                             <div
@@ -153,10 +270,11 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
                                 <div
-                                    className={`max-w-[80%] rounded-lg p-3 ${msg.role === 'user'
-                                        ? 'bg-[#c5a059] text-white'
-                                        : 'bg-white/5 text-[#e8dcc4] border border-[#c5a059]/20'
-                                        }`}
+                                    className={`max-w-[80%] rounded-lg p-3 ${
+                                        msg.role === 'user'
+                                            ? 'bg-[#c5a059] text-white'
+                                            : 'bg-white/5 text-[#e8dcc4] border border-[#c5a059]/20'
+                                    }`}
                                 >
                                     <div className="text-sm leading-relaxed">
                                         {msg.role === 'user' ? (
@@ -164,26 +282,40 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                                         ) : (
                                             <ReactMarkdown
                                                 components={{
-                                                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
-                                                    strong: ({ node, ...props }) => <strong className="text-[#ffd700] font-bold" {...props} />,
-                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1 mb-2 text-white/90" {...props} />,
-                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-4 space-y-1 mb-2 text-white/90" {...props} />,
-                                                    li: ({ node, ...props }) => <li className="marker:text-[#c5a059]" {...props} />,
-                                                    h1: ({ node, ...props }) => <h3 className="text-base font-bold text-[#c5a059] mt-3 mb-2" {...props} />,
-                                                    h2: ({ node, ...props }) => <h4 className="text-sm font-bold text-[#c5a059] mt-2 mb-1" {...props} />,
-                                                    h3: ({ node, ...props }) => <h5 className="text-sm font-bold text-[#c5a059] mt-2 mb-1" {...props} />,
-                                                    blockquote: ({ node, ...props }) => <blockquote className="border-l-2 border-[#c5a059] pl-3 italic text-white/70 my-2" {...props} />,
-                                                    img: ({ node, ...props }) => (
+                                                    p: ({ ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                                    strong: ({ ...props }) => (
+                                                        <strong className="text-[#ffd700] font-bold" {...props} />
+                                                    ),
+                                                    ul: ({ ...props }) => (
+                                                        <ul className="list-disc pl-4 space-y-1 mb-2 text-white/90" {...props} />
+                                                    ),
+                                                    ol: ({ ...props }) => (
+                                                        <ol className="list-decimal pl-4 space-y-1 mb-2 text-white/90" {...props} />
+                                                    ),
+                                                    li: ({ ...props }) => <li className="marker:text-[#c5a059]" {...props} />,
+                                                    h1: ({ ...props }) => (
+                                                        <h3 className="text-base font-bold text-[#c5a059] mt-3 mb-2" {...props} />
+                                                    ),
+                                                    h2: ({ ...props }) => (
+                                                        <h4 className="text-sm font-bold text-[#c5a059] mt-2 mb-1" {...props} />
+                                                    ),
+                                                    h3: ({ ...props }) => (
+                                                        <h5 className="text-sm font-bold text-[#c5a059] mt-2 mb-1" {...props} />
+                                                    ),
+                                                    blockquote: ({ ...props }) => (
+                                                        <blockquote
+                                                            className="border-l-2 border-[#c5a059] pl-3 italic text-white/70 my-2"
+                                                            {...props}
+                                                        />
+                                                    ),
+                                                    img: ({ ...props }) => (
                                                         <span className="block my-3">
                                                             <img
                                                                 {...props}
                                                                 alt={props.alt || '图片'}
-                                                                className="rounded-lg shadow-md border border-[#c5a059]/30 max-w-full h-auto mx-auto hover:scale-105 transition-transform duration-300"
+                                                                className="rounded-lg shadow-md border border-[#c5a059]/30 max-w-full h-auto mx-auto"
                                                                 loading="lazy"
                                                             />
-                                                            {props.alt && props.alt !== '图片' && (
-                                                                <span className="block text-center text-xs text-[#c5a059]/60 mt-1 italic">{props.alt}</span>
-                                                            )}
                                                         </span>
                                                     ),
                                                 }}
@@ -206,9 +338,15 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                             <div className="flex justify-start">
                                 <div className="bg-white/5 border border-[#c5a059]/20 rounded-lg p-3">
                                     <div className="flex gap-2">
-                                        <div className="w-2 h-2 bg-[#c5a059] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-2 h-2 bg-[#c5a059] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-2 h-2 bg-[#c5a059] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        <div className="w-2 h-2 bg-[#c5a059] rounded-full animate-bounce" />
+                                        <div
+                                            className="w-2 h-2 bg-[#c5a059] rounded-full animate-bounce"
+                                            style={{ animationDelay: '150ms' }}
+                                        />
+                                        <div
+                                            className="w-2 h-2 bg-[#c5a059] rounded-full animate-bounce"
+                                            style={{ animationDelay: '300ms' }}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -217,7 +355,6 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* 输入框 */}
                     <div className="p-4 border-t border-[#c5a059]/20">
                         <div className="flex gap-2">
                             <input
@@ -225,12 +362,18 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
                                 onKeyPress={handleKeyPress}
-                                placeholder="询问关于豳风图的问题..."
+                                placeholder={
+                                    chapterLabel
+                                        ? hotspot
+                                            ? `关于「${chapterLabel}」的问题…`
+                                            : `画卷在「${chapterLabel}」段，想问什么？`
+                                        : '询问关于豳风图的问题…'
+                                }
                                 disabled={isLoading}
                                 className="flex-1 bg-white/5 border border-[#c5a059]/30 rounded-lg px-4 py-2 text-[#e8dcc4] placeholder-white/30 focus:outline-none focus:border-[#c5a059] transition-colors text-sm"
                             />
                             <button
-                                onClick={handleSend}
+                                onClick={() => handleSend()}
                                 disabled={isLoading || !inputValue.trim()}
                                 className="bg-[#c5a059] hover:bg-[#8b7355] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 transition-colors"
                             >
@@ -239,9 +382,7 @@ const RagChat: React.FC<RagChatProps> = ({ onUserQuestion }) => {
                                 </svg>
                             </button>
                         </div>
-                        <p className="text-[#c5a059]/40 text-xs mt-2 text-center">
-                            按 Enter 发送 · Shift + Enter 换行
-                        </p>
+                        <p className="text-[#c5a059]/40 text-xs mt-2 text-center">解读模式 · I/C 切换沉浸</p>
                     </div>
                 </div>
             )}

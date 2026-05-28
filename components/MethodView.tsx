@@ -132,12 +132,49 @@ const Methodology: React.FC = () => {
         </section>
 
         <section className="space-y-8">
-          <h2 className="text-xl font-bold text-[#c5a059]">5. 交互系统架构：热点叙事 + 视频门户 + 动态注释</h2>
+          <h2 className="text-xl font-bold text-[#c5a059]">5. 交互系统架构：热点叙事 + 双轨门户 + 动态注释</h2>
+          <p className="text-white/60 text-sm leading-relaxed">
+            系统按「画卷沉浸浏览 → 热点解读门户 → 模式切换」组织交互路径。沉浸与解读并非仅切换文案，而是不同的界面语法、信息密度与辅助功能集合（由
+            <code className="text-[#c5a059]/80"> config/viewModes.ts </code>
+            统一约束）。
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-white/60 border border-white/10">
+              <thead>
+                <tr className="border-b border-white/10 bg-white/5">
+                  <th className="p-3 text-white/80">维度</th>
+                  <th className="p-3 text-white/80">沉浸模式 Immersive</th>
+                  <th className="p-3 text-white/80">解读模式 Interpret</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-white/5">
+                  <td className="p-3">默认入口</td>
+                  <td className="p-3">入卷后画卷巡游；门户内按 I/C 切换进入</td>
+                  <td className="p-3">点击热点默认打开；智能导览与侧栏同步呈现</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="p-3">信息密度</td>
+                  <td className="p-3">低：全屏影像 + 章节标题</td>
+                  <td className="p-3">高：篇章背景、AI 视点、风格变体、延展探索</td>
+                </tr>
+                <tr className="border-b border-white/5">
+                  <td className="p-3">交互</td>
+                  <td className="p-3">拖拽卷轴、观影；隐藏导览与小地图</td>
+                  <td className="p-3">RAG 问答、热点跳转、时序注释、原画对照</td>
+                </tr>
+                <tr>
+                  <td className="p-3">禁止交叉</td>
+                  <td className="p-3" colSpan={2}>沉浸态不出现侧栏长文与浮动问答；解读态视频 object-contain 不遮挡画心</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {[
-              { step: '01', title: '热点叙事', desc: '叙事节点以热点形式锚定在长卷坐标系中；支持平移/缩放/自动巡游与足迹记录。' },
-              { step: '02', title: '双轨门户', desc: 'VideoPortal 提供沉浸模式（专注观看）与解读模式（侧边图文解析），实现展示与解释并行。' },
-              { step: '03', title: '时序注释', desc: '视频播放监听关键帧触发半透明语义标注框，形成“空间 + 时间”的双维文化注释界面。' },
+              { step: '01', title: '热点叙事', desc: '叙事节点锚定于长卷坐标；支持自动巡游、足迹与章节导览。' },
+              { step: '02', title: '双轨门户', desc: '沉浸为全屏观影布局；解读为分栏面板 + 懒加载 AI 语义视点。' },
+              { step: '03', title: '上下文导览', desc: '解读模式下 RagChat 注入当前热点上下文并生成推荐问题。' },
             ].map(item => (
               <div key={item.step} className="p-6 bg-white/5 border border-white/10 space-y-4">
                 <div className="text-2xl font-bold text-white/10">{item.step}</div>

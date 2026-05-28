@@ -1226,13 +1226,6 @@ export default function LiquidEther({
         Common.resize();
         this.output.resize();
         
-        // 调试日志：确认比例计算
-        const mat = this.output.output.material as THREE.RawShaderMaterial;
-        console.log('LiquidEther Resize:', {
-          viewAspect: mat.uniforms.uViewAspect.value,
-          textureAspect: mat.uniforms.uTextureAspect.value,
-          ratio: mat.uniforms.uViewAspect.value / mat.uniforms.uTextureAspect.value
-        });
       }
       render() {
         if (this.autoDriver) this.autoDriver.update();
